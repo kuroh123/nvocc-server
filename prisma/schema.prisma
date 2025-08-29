@@ -1,0 +1,192 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RoleType {
+  ADMIN
+  CUSTOMER
+  PORT
+  DEPOT
+  SALES
+  MASTER_PORT
+  HR
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+model User {
+  id                String           @id @default(cuid())
+  email             String           @unique
+  password          String
+  firstName         String?
+  lastName          String?
+  phoneNumber       String?
+  status            UserStatus       @default(ACTIVE)
+  isEmailVerified   Boolean          @default(false)
+  emailVerifiedAt   DateTime?
+  lastLoginAt       DateTime?
+  profileImageUrl   String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  
+  // Relations
+  userRoles         UserRole[]
+  userSessions      UserSession[]
+  refreshTokens     RefreshToken[]
+  passwordResets    PasswordReset[]
+  activityLogs      ActivityLog[]
+  
+  @@map("users")
+}
+
+model Role {
+  id                String           @id @default(cuid())
+  name              RoleType         @unique
+  displayName       String
+  description       String?
+  permissions       String[]         // JSON array of permission strings
+  isActive          Boolean          @default(true)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  
+  // Relations
+  userRoles         UserRole[]
+  roleMenus         RoleMenu[]
+  
+  @@map("roles")
+}
+
+model UserRole {
+  id                String           @id @default(cuid())
+  userId            String
+  roleId            String
+  isActive          Boolean          @default(true)
+  assignedAt        DateTime         @default(now())
+  assignedBy        String?          // User ID who assigned this role
+  revokedAt         DateTime?
+  revokedBy         String?          // User ID who revoked this role
+  
+  // Relations
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role              Role             @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, roleId])
+  @@map("user_roles")
+}
+
+model UserSession {
+  id                String           @id @default(cuid())
+  userId            String
+  token             String           @unique
+  activeRole        RoleType?        // Current active role in this session
+  ipAddress         String?
+  userAgent         String?
+  isActive          Boolean          @default(true)
+  expiresAt         DateTime
+  createdAt         DateTime         @default(now())
+  lastActivityAt    DateTime         @default(now())
+  
+  // Relations
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("user_sessions")
+}
+
+model RefreshToken {
+  id                String           @id @default(cuid())
+  userId            String
+  token             String           @unique
+  isRevoked         Boolean          @default(false)
+  expiresAt         DateTime
+  createdAt         DateTime         @default(now())
+  
+  // Relations
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("refresh_tokens")
+}
+
+model PasswordReset {
+  id                String           @id @default(cuid())
+  userId            String
+  token             String           @unique
+  isUsed            Boolean          @default(false)
+  expiresAt         DateTime
+  createdAt         DateTime         @default(now())
+  usedAt            DateTime?
+  
+  // Relations
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("password_resets")
+}
+
+model Menu {
+  id                String           @id @default(cuid())
+  name              String
+  displayName       String
+  path              String?
+  icon              String?
+  parentId          String?
+  sortOrder         Int              @default(0)
+  isActive          Boolean          @default(true)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  
+  // Relations
+  parent            Menu?            @relation("MenuHierarchy", fields: [parentId], references: [id])
+  children          Menu[]           @relation("MenuHierarchy")
+  roleMenus         RoleMenu[]
+  
+  @@map("menus")
+}
+
+model RoleMenu {
+  id                String           @id @default(cuid())
+  roleId            String
+  menuId            String
+  canView           Boolean          @default(true)
+  canCreate         Boolean          @default(false)
+  canEdit           Boolean          @default(false)
+  canDelete         Boolean          @default(false)
+  createdAt         DateTime         @default(now())
+  
+  // Relations
+  role              Role             @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  menu              Menu             @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  
+  @@unique([roleId, menuId])
+  @@map("role_menus")
+}
+
+model ActivityLog {
+  id                String           @id @default(cuid())
+  userId            String?
+  action            String           // LOGIN, LOGOUT, ROLE_SWITCH, etc.
+  entity            String?          // What was affected
+  entityId          String?          // ID of affected entity
+  details           Json?            // Additional details
+  ipAddress         String?
+  userAgent         String?
+  createdAt         DateTime         @default(now())
+  
+  // Relations
+  user              User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  @@map("activity_logs")
+}
