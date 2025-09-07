@@ -3,19 +3,119 @@ const bcrypt = require("bcrypt");
 
 const prisma = new PrismaClient();
 
+// Define all permissions for the NVOCC platform
+const permissionsData = [
+  // Dashboard permissions
+  { name: "dashboard.view", displayName: "View Dashboard", module: "dashboard", category: "read" },
+  
+  // User management permissions
+  { name: "users.view", displayName: "View Users", module: "users", category: "read" },
+  { name: "users.create", displayName: "Create Users", module: "users", category: "write" },
+  { name: "users.update", displayName: "Update Users", module: "users", category: "write" },
+  { name: "users.delete", displayName: "Delete Users", module: "users", category: "admin" },
+  
+  // Role management permissions
+  { name: "roles.view", displayName: "View Roles", module: "roles", category: "read" },
+  { name: "roles.manage", displayName: "Manage Roles", module: "roles", category: "admin" },
+  
+  // Booking permissions
+  { name: "bookings.view", displayName: "View Bookings", module: "bookings", category: "read" },
+  { name: "bookings.create", displayName: "Create Bookings", module: "bookings", category: "write" },
+  { name: "bookings.update", displayName: "Update Bookings", module: "bookings", category: "write" },
+  { name: "bookings.cancel", displayName: "Cancel Bookings", module: "bookings", category: "write" },
+  { name: "bookings.delete", displayName: "Delete Bookings", module: "bookings", category: "admin" },
+  
+  // Bill of Lading permissions
+  { name: "bl.view", displayName: "View Bill of Lading", module: "bl", category: "read" },
+  { name: "bl.create", displayName: "Create Bill of Lading", module: "bl", category: "write" },
+  { name: "bl.update", displayName: "Update Bill of Lading", module: "bl", category: "write" },
+  { name: "bl.release", displayName: "Release Bill of Lading", module: "bl", category: "admin" },
+  
+  // Vessel management permissions
+  { name: "vessels.view", displayName: "View Vessels", module: "vessels", category: "read" },
+  { name: "vessels.create", displayName: "Create Vessels", module: "vessels", category: "write" },
+  { name: "vessels.update", displayName: "Update Vessels", module: "vessels", category: "write" },
+  { name: "vessels.delete", displayName: "Delete Vessels", module: "vessels", category: "admin" },
+  
+  // Schedule permissions
+  { name: "schedules.view", displayName: "View Schedules", module: "schedules", category: "read" },
+  { name: "schedules.create", displayName: "Create Schedules", module: "schedules", category: "write" },
+  { name: "schedules.update", displayName: "Update Schedules", module: "schedules", category: "write" },
+  { name: "schedules.delete", displayName: "Delete Schedules", module: "schedules", category: "admin" },
+  
+  // Container management permissions
+  { name: "containers.view", displayName: "View Containers", module: "containers", category: "read" },
+  { name: "containers.create", displayName: "Create Containers", module: "containers", category: "write" },
+  { name: "containers.update", displayName: "Update Containers", module: "containers", category: "write" },
+  { name: "containers.track", displayName: "Track Containers", module: "containers", category: "read" },
+  
+  // Customer management permissions
+  { name: "customers.view", displayName: "View Customers", module: "customers", category: "read" },
+  { name: "customers.create", displayName: "Create Customers", module: "customers", category: "write" },
+  { name: "customers.update", displayName: "Update Customers", module: "customers", category: "write" },
+  { name: "customers.delete", displayName: "Delete Customers", module: "customers", category: "admin" },
+  
+  // Quote management permissions
+  { name: "quotes.view", displayName: "View Quotes", module: "quotes", category: "read" },
+  { name: "quotes.create", displayName: "Create Quotes", module: "quotes", category: "write" },
+  { name: "quotes.update", displayName: "Update Quotes", module: "quotes", category: "write" },
+  { name: "quotes.approve", displayName: "Approve Quotes", module: "quotes", category: "admin" },
+  
+  // Document management permissions
+  { name: "documents.view", displayName: "View Documents", module: "documents", category: "read" },
+  { name: "documents.upload", displayName: "Upload Documents", module: "documents", category: "write" },
+  { name: "documents.download", displayName: "Download Documents", module: "documents", category: "read" },
+  
+  // Report permissions
+  { name: "reports.view", displayName: "View Reports", module: "reports", category: "read" },
+  { name: "reports.export", displayName: "Export Reports", module: "reports", category: "write" },
+  { name: "reports.all", displayName: "Access All Reports", module: "reports", category: "admin" },
+  
+  // System administration permissions
+  { name: "system.settings", displayName: "System Settings", module: "system", category: "admin" },
+  { name: "system.logs", displayName: "View System Logs", module: "system", category: "admin" },
+  { name: "system.backup", displayName: "System Backup", module: "system", category: "admin" },
+  
+  // Port operations permissions
+  { name: "port.operations", displayName: "Port Operations", module: "port", category: "write" },
+  { name: "port.management", displayName: "Port Management", module: "port", category: "admin" },
+  
+  // Depot operations permissions
+  { name: "depot.operations", displayName: "Depot Operations", module: "depot", category: "write" },
+  { name: "depot.inventory", displayName: "Depot Inventory", module: "depot", category: "read" },
+  
+  // HR permissions
+  { name: "employees.view", displayName: "View Employees", module: "employees", category: "read" },
+  { name: "employees.create", displayName: "Create Employees", module: "employees", category: "write" },
+  { name: "employees.update", displayName: "Update Employees", module: "employees", category: "write" },
+  { name: "employees.delete", displayName: "Delete Employees", module: "employees", category: "admin" },
+  { name: "payroll.view", displayName: "View Payroll", module: "payroll", category: "read" },
+];
+
+// Define roles and their permission mappings
 const rolesData = [
   {
     name: "ADMIN",
     displayName: "Administrator",
     description: "Full system access with all permissions",
     permissions: [
-      "users.create",
-      "users.read",
-      "users.update",
-      "users.delete",
-      "roles.manage",
-      "system.manage",
-      "reports.all",
+      "dashboard.view",
+      "users.view", "users.create", "users.update", "users.delete",
+      "roles.view", "roles.manage",
+      "bookings.view", "bookings.create", "bookings.update", "bookings.cancel", "bookings.delete",
+      "bl.view", "bl.create", "bl.update", "bl.release",
+      "vessels.view", "vessels.create", "vessels.update", "vessels.delete",
+      "schedules.view", "schedules.create", "schedules.update", "schedules.delete",
+      "containers.view", "containers.create", "containers.update", "containers.track",
+      "customers.view", "customers.create", "customers.update", "customers.delete",
+      "quotes.view", "quotes.create", "quotes.update", "quotes.approve",
+      "documents.view", "documents.upload", "documents.download",
+      "reports.view", "reports.export", "reports.all",
+      "system.settings", "system.logs", "system.backup",
+      "port.operations", "port.management",
+      "depot.operations", "depot.inventory",
+      "employees.view", "employees.create", "employees.update", "employees.delete",
+      "payroll.view"
     ],
   },
   {
@@ -23,11 +123,12 @@ const rolesData = [
     displayName: "Customer",
     description: "Customer portal access for booking and tracking",
     permissions: [
-      "bookings.create",
-      "bookings.read",
-      "bookings.update",
-      "tracking.read",
-      "documents.read",
+      "dashboard.view",
+      "bookings.view", "bookings.create", "bookings.update",
+      "bl.view",
+      "containers.view", "containers.track",
+      "quotes.view", "quotes.create",
+      "documents.view", "documents.upload", "documents.download"
     ],
   },
   {
@@ -35,11 +136,13 @@ const rolesData = [
     displayName: "Port User",
     description: "Port operations and vessel management",
     permissions: [
-      "vessels.read",
-      "vessels.update",
-      "schedules.read",
-      "schedules.update",
+      "dashboard.view",
+      "bookings.view",
+      "vessels.view", "vessels.update",
+      "schedules.view", "schedules.update",
+      "containers.view", "containers.update", "containers.track",
       "port.operations",
+      "documents.view", "documents.upload"
     ],
   },
   {
@@ -47,11 +150,11 @@ const rolesData = [
     displayName: "Depot User",
     description: "Depot and container management",
     permissions: [
-      "containers.read",
-      "containers.update",
-      "inventory.read",
-      "inventory.update",
-      "depot.operations",
+      "dashboard.view",
+      "bookings.view",
+      "containers.view", "containers.update", "containers.track",
+      "depot.operations", "depot.inventory",
+      "documents.view", "documents.upload"
     ],
   },
   {
@@ -59,13 +162,12 @@ const rolesData = [
     displayName: "Sales Representative",
     description: "Sales activities and customer management",
     permissions: [
-      "customers.create",
-      "customers.read",
-      "customers.update",
-      "quotes.create",
-      "quotes.read",
-      "quotes.update",
-      "sales.reports",
+      "dashboard.view",
+      "customers.view", "customers.create", "customers.update",
+      "quotes.view", "quotes.create", "quotes.update",
+      "bookings.view", "bookings.create",
+      "reports.view", "reports.export",
+      "documents.view", "documents.upload"
     ],
   },
   {
@@ -73,16 +175,14 @@ const rolesData = [
     displayName: "Master Port",
     description: "Master port operations with elevated permissions",
     permissions: [
-      "vessels.create",
-      "vessels.read",
-      "vessels.update",
-      "vessels.delete",
-      "schedules.create",
-      "schedules.read",
-      "schedules.update",
-      "schedules.delete",
-      "port.operations",
-      "port.management",
+      "dashboard.view",
+      "bookings.view",
+      "vessels.view", "vessels.create", "vessels.update", "vessels.delete",
+      "schedules.view", "schedules.create", "schedules.update", "schedules.delete",
+      "containers.view", "containers.update", "containers.track",
+      "port.operations", "port.management",
+      "documents.view", "documents.upload",
+      "reports.view", "reports.export"
     ],
   },
   {
@@ -90,319 +190,26 @@ const rolesData = [
     displayName: "Human Resources",
     description: "Human resources and employee management",
     permissions: [
-      "employees.create",
-      "employees.read",
-      "employees.update",
-      "employees.delete",
-      "payroll.read",
-      "hr.reports",
+      "dashboard.view",
+      "employees.view", "employees.create", "employees.update", "employees.delete",
+      "payroll.view",
+      "reports.view", "reports.export",
+      "documents.view", "documents.upload"
     ],
   },
 ];
 
-const menusData = [
+// Sample tenant data
+const tenantsData = [
   {
-    name: "dashboard",
-    displayName: "Dashboard",
-    path: "/dashboard",
-    icon: "dashboard",
-    parentId: null,
-    sortOrder: 1,
-  },
-  {
-    name: "bookings",
-    displayName: "Bookings",
-    path: "/bookings",
-    icon: "booking",
-    parentId: null,
-    sortOrder: 2,
-  },
-  {
-    name: "bookings_list",
-    displayName: "All Bookings",
-    path: "/bookings/list",
-    icon: "list",
-    parentId: null, // Will be set after bookings is created
-    sortOrder: 1,
-  },
-  {
-    name: "bookings_create",
-    displayName: "New Booking",
-    path: "/bookings/create",
-    icon: "add",
-    parentId: null, // Will be set after bookings is created
-    sortOrder: 2,
-  },
-  {
-    name: "vessels",
-    displayName: "Vessels",
-    path: "/vessels",
-    icon: "ship",
-    parentId: null,
-    sortOrder: 3,
-  },
-  {
-    name: "vessels_list",
-    displayName: "All Vessels",
-    path: "/vessels/list",
-    icon: "list",
-    parentId: null, // Will be set after vessels is created
-    sortOrder: 1,
-  },
-  {
-    name: "vessels_schedules",
-    displayName: "Schedules",
-    path: "/vessels/schedules",
-    icon: "schedule",
-    parentId: null, // Will be set after vessels is created
-    sortOrder: 2,
-  },
-  {
-    name: "containers",
-    displayName: "Containers",
-    path: "/containers",
-    icon: "container",
-    parentId: null,
-    sortOrder: 4,
-  },
-  {
-    name: "containers_inventory",
-    displayName: "Inventory",
-    path: "/containers/inventory",
-    icon: "inventory",
-    parentId: null, // Will be set after containers is created
-    sortOrder: 1,
-  },
-  {
-    name: "customers",
-    displayName: "Customers",
-    path: "/customers",
-    icon: "people",
-    parentId: null,
-    sortOrder: 5,
-  },
-  {
-    name: "customers_list",
-    displayName: "All Customers",
-    path: "/customers/list",
-    icon: "list",
-    parentId: null, // Will be set after customers is created
-    sortOrder: 1,
-  },
-  {
-    name: "reports",
-    displayName: "Reports",
-    path: "/reports",
-    icon: "report",
-    parentId: null,
-    sortOrder: 6,
-  },
-  {
-    name: "administration",
-    displayName: "Administration",
-    path: "/admin",
-    icon: "admin",
-    parentId: null,
-    sortOrder: 7,
-  },
-  {
-    name: "admin_users",
-    displayName: "User Management",
-    path: "/admin/users",
-    icon: "users",
-    parentId: null, // Will be set after administration is created
-    sortOrder: 1,
-  },
-  {
-    name: "admin_roles",
-    displayName: "Role Management",
-    path: "/admin/roles",
-    icon: "roles",
-    parentId: null, // Will be set after administration is created
-    sortOrder: 2,
-  },
-  {
-    name: "hr",
-    displayName: "Human Resources",
-    path: "/hr",
-    icon: "hr",
-    parentId: null,
-    sortOrder: 8,
-  },
-  {
-    name: "hr_employees",
-    displayName: "Employees",
-    path: "/hr/employees",
-    icon: "employee",
-    parentId: null, // Will be set after hr is created
-    sortOrder: 1,
+    name: "NVOCC Demo Company",
+    app_abbr: "DEMO",
+    website_url: "https://demo.nvocc.com",
+    email: "admin@demo.nvocc.com",
+    prefix_booking: "DEMO",
+    prefix_bl: "DM",
   },
 ];
-
-const roleMenuPermissions = {
-  ADMIN: {
-    // Admin has access to everything
-    "*": { canView: true, canCreate: true, canEdit: true, canDelete: true },
-  },
-  CUSTOMER: {
-    dashboard: {
-      canView: true,
-      canCreate: false,
-      canEdit: false,
-      canDelete: false,
-    },
-    bookings: {
-      canView: true,
-      canCreate: true,
-      canEdit: true,
-      canDelete: false,
-    },
-    bookings_list: {
-      canView: true,
-      canCreate: false,
-      canEdit: false,
-      canDelete: false,
-    },
-    bookings_create: {
-      canView: true,
-      canCreate: true,
-      canEdit: false,
-      canDelete: false,
-    },
-  },
-  PORT: {
-    dashboard: {
-      canView: true,
-      canCreate: false,
-      canEdit: false,
-      canDelete: false,
-    },
-    vessels: {
-      canView: true,
-      canCreate: false,
-      canEdit: true,
-      canDelete: false,
-    },
-    vessels_list: {
-      canView: true,
-      canCreate: false,
-      canEdit: false,
-      canDelete: false,
-    },
-    vessels_schedules: {
-      canView: true,
-      canCreate: false,
-      canEdit: true,
-      canDelete: false,
-    },
-  },
-  DEPOT: {
-    dashboard: {
-      canView: true,
-      canCreate: false,
-      canEdit: false,
-      canDelete: false,
-    },
-    containers: {
-      canView: true,
-      canCreate: false,
-      canEdit: true,
-      canDelete: false,
-    },
-    containers_inventory: {
-      canView: true,
-      canCreate: false,
-      canEdit: true,
-      canDelete: false,
-    },
-  },
-  SALES: {
-    dashboard: {
-      canView: true,
-      canCreate: false,
-      canEdit: false,
-      canDelete: false,
-    },
-    bookings: {
-      canView: true,
-      canCreate: true,
-      canEdit: true,
-      canDelete: false,
-    },
-    bookings_list: {
-      canView: true,
-      canCreate: false,
-      canEdit: false,
-      canDelete: false,
-    },
-    bookings_create: {
-      canView: true,
-      canCreate: true,
-      canEdit: false,
-      canDelete: false,
-    },
-    customers: {
-      canView: true,
-      canCreate: true,
-      canEdit: true,
-      canDelete: false,
-    },
-    customers_list: {
-      canView: true,
-      canCreate: false,
-      canEdit: false,
-      canDelete: false,
-    },
-    reports: {
-      canView: true,
-      canCreate: false,
-      canEdit: false,
-      canDelete: false,
-    },
-  },
-  MASTER_PORT: {
-    dashboard: {
-      canView: true,
-      canCreate: false,
-      canEdit: false,
-      canDelete: false,
-    },
-    vessels: { canView: true, canCreate: true, canEdit: true, canDelete: true },
-    vessels_list: {
-      canView: true,
-      canCreate: false,
-      canEdit: false,
-      canDelete: false,
-    },
-    vessels_schedules: {
-      canView: true,
-      canCreate: true,
-      canEdit: true,
-      canDelete: true,
-    },
-  },
-  HR: {
-    dashboard: {
-      canView: true,
-      canCreate: false,
-      canEdit: false,
-      canDelete: false,
-    },
-    hr: { canView: true, canCreate: false, canEdit: false, canDelete: false },
-    hr_employees: {
-      canView: true,
-      canCreate: true,
-      canEdit: true,
-      canDelete: false,
-    },
-    reports: {
-      canView: true,
-      canCreate: false,
-      canEdit: false,
-      canDelete: false,
-    },
-  },
-};
 
 async function main() {
   console.log("🌱 Starting database seeding...");
@@ -411,135 +218,70 @@ async function main() {
     // Clear existing data (in development only)
     if (process.env.NODE_ENV === "development") {
       console.log("🧹 Clearing existing data...");
-      await prisma.roleMenu.deleteMany();
-      await prisma.userRole.deleteMany();
       await prisma.userSession.deleteMany();
       await prisma.refreshToken.deleteMany();
       await prisma.passwordReset.deleteMany();
       await prisma.activityLog.deleteMany();
-      await prisma.menu.deleteMany();
-      await prisma.role.deleteMany();
       await prisma.user.deleteMany();
+      await prisma.permission.deleteMany();
+      await prisma.role.deleteMany();
+      await prisma.tenant.deleteMany();
     }
 
-    // Create roles
-    console.log("📋 Creating roles...");
+    // Create tenants first
+    console.log("🏢 Creating tenants...");
+    const createdTenants = {};
+    for (const tenantData of tenantsData) {
+      const tenant = await prisma.tenant.create({
+        data: tenantData,
+      });
+      createdTenants[tenant.app_abbr] = tenant;
+      console.log(`✅ Created tenant: ${tenant.name}`);
+    }
+
+    // Create permissions
+    console.log("� Creating permissions...");
+    const createdPermissions = {};
+    for (const permissionData of permissionsData) {
+      const permission = await prisma.permission.create({
+        data: permissionData,
+      });
+      createdPermissions[permission.name] = permission;
+      console.log(`✅ Created permission: ${permission.displayName}`);
+    }
+
+    // Create roles with their permissions
+    console.log("📋 Creating roles and assigning permissions...");
     const createdRoles = {};
     for (const roleData of rolesData) {
+      const { permissions, ...roleDataWithoutPermissions } = roleData;
+      
+      // Get permission IDs for this role
+      const rolePermissions = permissions
+        .map(permName => createdPermissions[permName])
+        .filter(perm => perm !== undefined);
+
       const role = await prisma.role.create({
-        data: roleData,
-      });
-      createdRoles[role.name] = role;
-      console.log(`✅ Created role: ${role.displayName}`);
-    }
-
-    // Create menus (first create parent menus)
-    console.log("🗂️ Creating menus...");
-    const createdMenus = {};
-
-    // Create parent menus first
-    const parentMenus = menusData.filter(
-      (menu) =>
-        menu.parentId === null &&
-        ![
-          "bookings_list",
-          "bookings_create",
-          "vessels_list",
-          "vessels_schedules",
-          "containers_inventory",
-          "customers_list",
-          "admin_users",
-          "admin_roles",
-          "hr_employees",
-        ].includes(menu.name)
-    );
-
-    for (const menuData of parentMenus) {
-      const menu = await prisma.menu.create({
-        data: menuData,
-      });
-      createdMenus[menu.name] = menu;
-      console.log(`✅ Created parent menu: ${menu.displayName}`);
-    }
-
-    // Create child menus
-    const childMenuMappings = {
-      bookings_list: "bookings",
-      bookings_create: "bookings",
-      vessels_list: "vessels",
-      vessels_schedules: "vessels",
-      containers_inventory: "containers",
-      customers_list: "customers",
-      admin_users: "administration",
-      admin_roles: "administration",
-      hr_employees: "hr",
-    };
-
-    const childMenus = menusData.filter((menu) =>
-      Object.keys(childMenuMappings).includes(menu.name)
-    );
-
-    for (const menuData of childMenus) {
-      const parentMenuName = childMenuMappings[menuData.name];
-      const parentMenu = createdMenus[parentMenuName];
-
-      if (parentMenu) {
-        const menu = await prisma.menu.create({
-          data: {
-            ...menuData,
-            parentId: parentMenu.id,
+        data: {
+          ...roleDataWithoutPermissions,
+          permissions: {
+            connect: rolePermissions.map(perm => ({ id: perm.id })),
           },
-        });
-        createdMenus[menu.name] = menu;
-        console.log(
-          `✅ Created child menu: ${menu.displayName} under ${parentMenu.displayName}`
-        );
-      }
-    }
-
-    // Create role-menu relationships
-    console.log("🔗 Creating role-menu relationships...");
-    for (const [roleName, menuPermissions] of Object.entries(
-      roleMenuPermissions
-    )) {
-      const role = createdRoles[roleName];
-
-      if (menuPermissions["*"]) {
-        // Admin gets access to all menus
-        for (const menu of Object.values(createdMenus)) {
-          await prisma.roleMenu.create({
-            data: {
-              roleId: role.id,
-              menuId: menu.id,
-              ...menuPermissions["*"],
-            },
-          });
-        }
-        console.log(`✅ Granted ${roleName} access to all menus`);
-      } else {
-        // Other roles get specific menu access
-        for (const [menuName, permissions] of Object.entries(menuPermissions)) {
-          const menu = createdMenus[menuName];
-          if (menu) {
-            await prisma.roleMenu.create({
-              data: {
-                roleId: role.id,
-                menuId: menu.id,
-                ...permissions,
-              },
-            });
-          }
-        }
-        console.log(`✅ Granted ${roleName} access to specific menus`);
-      }
+        },
+      });
+      
+      createdRoles[role.name] = role;
+      console.log(`✅ Created role: ${role.displayName} with ${rolePermissions.length} permissions`);
     }
 
     // Create default admin user
     console.log("👤 Creating default admin user...");
     const hashedPassword = await bcrypt.hash("Admin@123", 12);
+    const defaultTenant = createdTenants["DEMO"];
 
     const adminUser = await prisma.user.create({
       data: {
+        tenantId: defaultTenant.id,
         email: "admin@nvocc.com",
         password: hashedPassword,
         firstName: "System",
@@ -547,15 +289,9 @@ async function main() {
         status: "ACTIVE",
         isEmailVerified: true,
         emailVerifiedAt: new Date(),
-      },
-    });
-
-    // Assign admin role to admin user
-    await prisma.userRole.create({
-      data: {
-        userId: adminUser.id,
-        roleId: createdRoles.ADMIN.id,
-        assignedBy: adminUser.id, // Self-assigned
+        roles: {
+          connect: { id: createdRoles.ADMIN.id },
+        },
       },
     });
 
@@ -602,6 +338,7 @@ async function main() {
 
       const user = await prisma.user.create({
         data: {
+          tenantId: defaultTenant.id,
           email: userData.email,
           password: hashedUserPassword,
           firstName: userData.firstName,
@@ -609,19 +346,11 @@ async function main() {
           status: "ACTIVE",
           isEmailVerified: true,
           emailVerifiedAt: new Date(),
+          roles: {
+            connect: userData.roles.map(roleName => ({ id: createdRoles[roleName].id })),
+          },
         },
       });
-
-      // Assign roles
-      for (const roleName of userData.roles) {
-        await prisma.userRole.create({
-          data: {
-            userId: user.id,
-            roleId: createdRoles[roleName].id,
-            assignedBy: adminUser.id,
-          },
-        });
-      }
 
       console.log(
         `✅ Created user: ${userData.email} with roles: ${userData.roles.join(

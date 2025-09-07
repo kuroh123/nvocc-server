@@ -82,11 +82,11 @@ router.get("/profile", authenticate, authController.getProfile);
 router.get("/roles", authenticate, authController.getAvailableRoles);
 
 /**
- * @route   GET /api/auth/menus
- * @desc    Get user's menus based on active role
+ * @route   GET /api/auth/permissions
+ * @desc    Get user's permissions based on active role
  * @access  Private
  */
-router.get("/menus", authenticate, authController.getMenus);
+router.get("/permissions", authenticate, authController.getPermissions);
 
 /**
  * @route   GET /api/auth/check

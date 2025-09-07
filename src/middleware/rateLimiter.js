@@ -59,7 +59,7 @@ const registrationLimiter = rateLimit({
 
 // Rate limiting for role switching (to prevent abuse)
 const roleSwitchLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000, // 5 minutes
+  windowMs: 60 * 1000, // 5 minutes
   max: 10, // Limit each IP to 10 role switches per 5 minutes
   message: {
     success: false,

@@ -29,8 +29,39 @@ enum UserStatus {
   SUSPENDED
 }
 
+model Tenant {
+  id                            String           @id @default(cuid())
+  name                          String
+  app_abbr                      String           @unique
+  website_url                   String?
+  email                         String
+  activation                    Boolean          @default(true)
+  resend_activation_threshold   Int              @default(3)
+  language                      String           @default("en")
+  template                      String           @default("default")
+  app_version                   String           @default("1.0.0")
+  app_status                    String           @default("active")
+  app_msg                       String?
+  prefix_booking                String           @default("BKG")
+  prefix_bl                     String           @default("BL")
+  password_expiry_days          Int              @default(90)
+  max_user_sessions             Int              @default(5)
+  booking_confirmation_text     String?
+  currency_converter_api_key    String?
+  audit_trail_anyoperation      Boolean          @default(true)
+  createdAt                     DateTime         @default(now())
+  updatedAt                     DateTime         @updatedAt
+  
+  // Relations
+  users                         User[]
+  
+  @@map("tenants")
+}
+
+
 model User {
   id                String           @id @default(cuid())
+  tenantId          String
   email             String           @unique
   password          String
   firstName         String?
@@ -45,7 +76,8 @@ model User {
   updatedAt         DateTime         @updatedAt
   
   // Relations
-  userRoles         UserRole[]
+  tenant            Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  roles             Role[]
   userSessions      UserSession[]
   refreshTokens     RefreshToken[]
   passwordResets    PasswordReset[]
@@ -59,34 +91,32 @@ model Role {
   name              RoleType         @unique
   displayName       String
   description       String?
-  permissions       String[]         // JSON array of permission strings
   isActive          Boolean          @default(true)
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
   
   // Relations
-  userRoles         UserRole[]
-  roleMenus         RoleMenu[]
+  users             User[]
+  permissions       Permission[]
   
   @@map("roles")
 }
 
-model UserRole {
+model Permission {
   id                String           @id @default(cuid())
-  userId            String
-  roleId            String
+  name              String           @unique  // e.g., "bookings.create"
+  displayName       String                   // e.g., "Create Bookings"
+  description       String?
+  module            String                   // e.g., "bookings", "users", "reports"
+  category          String?                  // e.g., "read", "write", "admin"
   isActive          Boolean          @default(true)
-  assignedAt        DateTime         @default(now())
-  assignedBy        String?          // User ID who assigned this role
-  revokedAt         DateTime?
-  revokedBy         String?          // User ID who revoked this role
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
   
   // Relations
-  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role              Role             @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  roles             Role[]
   
-  @@unique([userId, roleId])
-  @@map("user_roles")
+  @@map("permissions")
 }
 
 model UserSession {
@@ -134,44 +164,6 @@ model PasswordReset {
   user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   @@map("password_resets")
-}
-
-model Menu {
-  id                String           @id @default(cuid())
-  name              String
-  displayName       String
-  path              String?
-  icon              String?
-  parentId          String?
-  sortOrder         Int              @default(0)
-  isActive          Boolean          @default(true)
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-  
-  // Relations
-  parent            Menu?            @relation("MenuHierarchy", fields: [parentId], references: [id])
-  children          Menu[]           @relation("MenuHierarchy")
-  roleMenus         RoleMenu[]
-  
-  @@map("menus")
-}
-
-model RoleMenu {
-  id                String           @id @default(cuid())
-  roleId            String
-  menuId            String
-  canView           Boolean          @default(true)
-  canCreate         Boolean          @default(false)
-  canEdit           Boolean          @default(false)
-  canDelete         Boolean          @default(false)
-  createdAt         DateTime         @default(now())
-  
-  // Relations
-  role              Role             @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  menu              Menu             @relation(fields: [menuId], references: [id], onDelete: Cascade)
-  
-  @@unique([roleId, menuId])
-  @@map("role_menus")
 }
 
 model ActivityLog {
