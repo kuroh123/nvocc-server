@@ -77,6 +77,7 @@ class AuthService {
     const user = await prisma.user.findUnique({
       where: { email },
       include: {
+        tenant: true,
         roles: {
           include: {
             permissions: true,
@@ -85,6 +86,7 @@ class AuthService {
       },
     });
 
+    console.log("User attempting login:", user ? user : "Not found");
     if (!user) {
       await this.logActivity(
         null,
@@ -195,6 +197,7 @@ class AuthService {
     return {
       user: {
         id: user.id,
+        tenant: user.tenant ? user.tenant : null,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
