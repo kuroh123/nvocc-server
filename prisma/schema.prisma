@@ -217,6 +217,7 @@ model Terminal {
   name        String   @unique
   portId      String
   status      Status   @default(ACTIVE)
+  description String?
   createdById String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

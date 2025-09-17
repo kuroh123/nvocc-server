@@ -1,17 +1,10 @@
 const prisma = require("../utils/prisma");
 const { validationResult } = require("express-validator");
 
-class PortController {
-  async getAllPorts(req, res) {
+class TerminalController {
+  async getAllTerminals(req, res) {
     try {
-      const {
-        page = 1,
-        limit = 10,
-        search,
-        status,
-        portType,
-        countryId,
-      } = req.query;
+      const { page = 1, limit = 10, search, status, portId } = req.query;
 
       const skip = (parseInt(page) - 1) * parseInt(limit);
 
@@ -19,35 +12,35 @@ class PortController {
       const where = {};
 
       if (search) {
-        where.OR = [
-          { name: { contains: search, mode: "insensitive" } },
-          { portCode: { contains: search, mode: "insensitive" } },
-          { itaCode: { contains: search, mode: "insensitive" } },
-        ];
+        where.OR = [{ name: { contains: search, mode: "insensitive" } }];
       }
 
       if (status) {
         where.status = status;
       }
 
-      if (portType) {
-        where.portType = portType;
+      if (portId) {
+        where.portId = portId;
       }
 
-      if (countryId) {
-        where.countryId = countryId;
-      }
-
-      const [ports, total] = await Promise.all([
-        prisma.port.findMany({
+      const [terminals, total] = await Promise.all([
+        prisma.terminal.findMany({
           where,
           include: {
-            country: {
+            port: {
               select: {
                 id: true,
                 name: true,
-                codeChar2: true,
-                codeChar3: true,
+                portType: true,
+                portCode: true,
+                country: {
+                  select: {
+                    id: true,
+                    name: true,
+                    codeChar2: true,
+                    codeChar3: true,
+                  },
+                },
               },
             },
             createdBy: {
@@ -58,13 +51,6 @@ class PortController {
                 email: true,
               },
             },
-            Terminal: {
-              select: {
-                id: true,
-                name: true,
-                status: true,
-              },
-            },
           },
           skip,
           take: parseInt(limit),
@@ -72,12 +58,12 @@ class PortController {
             createdAt: "desc",
           },
         }),
-        prisma.port.count({ where }),
+        prisma.terminal.count({ where }),
       ]);
 
       res.json({
         success: true,
-        data: ports,
+        data: terminals,
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),
@@ -86,23 +72,27 @@ class PortController {
         },
       });
     } catch (error) {
-      console.error("Error fetching ports:", error);
+      console.error("Error fetching terminals:", error);
       res.status(500).json({
         success: false,
         error: "Internal Server Error",
-        message: "Failed to fetch ports",
+        message: "Failed to fetch terminals",
       });
     }
   }
 
-  async getPortById(req, res) {
+  async getTerminalById(req, res) {
     try {
       const { id } = req.params;
 
-      const port = await prisma.port.findUnique({
+      const terminal = await prisma.terminal.findUnique({
         where: { id },
         include: {
-          country: true,
+          port: {
+            include: {
+              country: true,
+            },
+          },
           createdBy: {
             select: {
               id: true,
@@ -111,44 +101,32 @@ class PortController {
               email: true,
             },
           },
-          Terminal: {
-            include: {
-              createdBy: {
-                select: {
-                  id: true,
-                  firstName: true,
-                  lastName: true,
-                  email: true,
-                },
-              },
-            },
-          },
         },
       });
 
-      if (!port) {
+      if (!terminal) {
         return res.status(404).json({
           success: false,
           error: "Not Found",
-          message: "Port not found",
+          message: "Terminal not found",
         });
       }
 
       res.json({
         success: true,
-        data: port,
+        data: terminal,
       });
     } catch (error) {
-      console.error("Error fetching port:", error);
+      console.error("Error fetching terminal:", error);
       res.status(500).json({
         success: false,
         error: "Internal Server Error",
-        message: "Failed to fetch port",
+        message: "Failed to fetch terminal",
       });
     }
   }
 
-  async createPort(req, res) {
+  async createTerminal(req, res) {
     try {
       // Check for validation errors
       const errors = validationResult(req);
@@ -161,63 +139,58 @@ class PortController {
         });
       }
 
-      const {
-        name,
-        portType,
-        countryId,
-        itaCode,
-        portCode,
-        customsDetails,
-        status,
-      } = req.body;
+      const { name, portId, status, description } = req.body;
       const createdById = req.user?.id; // Assuming user is attached to req by auth middleware
 
-      // Check if country exists
-      const country = await prisma.country.findUnique({
-        where: { id: countryId },
+      // Check if port exists
+      const port = await prisma.port.findUnique({
+        where: { id: portId },
       });
 
-      if (!country) {
+      if (!port) {
         return res.status(400).json({
           success: false,
           error: "Validation Error",
-          message: "Invalid country specified",
+          message: "Invalid port specified",
         });
       }
 
-      // Check for duplicate port code if provided
-      if (portCode) {
-        const existingPort = await prisma.port.findFirst({
-          where: { portCode },
-        });
+      // Check for duplicate terminal name
+      const existingTerminal = await prisma.terminal.findFirst({
+        where: { name },
+      });
 
-        if (existingPort) {
-          return res.status(409).json({
-            success: false,
-            error: "Conflict",
-            message: "Port code already exists",
-          });
-        }
+      if (existingTerminal) {
+        return res.status(409).json({
+          success: false,
+          error: "Conflict",
+          message: "Terminal name already exists",
+        });
       }
 
-      const newPort = await prisma.port.create({
+      const newTerminal = await prisma.terminal.create({
         data: {
           name,
-          portType,
-          countryId,
-          itaCode,
-          portCode,
-          customsDetails,
+          portId,
           status: status || "ACTIVE",
+          description,
           createdById,
         },
         include: {
-          country: {
+          port: {
             select: {
               id: true,
               name: true,
-              codeChar2: true,
-              codeChar3: true,
+              portType: true,
+              portCode: true,
+              country: {
+                select: {
+                  id: true,
+                  name: true,
+                  codeChar2: true,
+                  codeChar3: true,
+                },
+              },
             },
           },
           createdBy: {
@@ -233,30 +206,30 @@ class PortController {
 
       res.status(201).json({
         success: true,
-        data: newPort,
-        message: "Port created successfully",
+        data: newTerminal,
+        message: "Terminal created successfully",
       });
     } catch (error) {
-      console.error("Error creating port:", error);
+      console.error("Error creating terminal:", error);
 
       // Handle Prisma unique constraint errors
       if (error.code === "P2002") {
         return res.status(409).json({
           success: false,
           error: "Conflict",
-          message: "A port with this information already exists",
+          message: "A terminal with this information already exists",
         });
       }
 
       res.status(500).json({
         success: false,
         error: "Internal Server Error",
-        message: "Failed to create port",
+        message: "Failed to create terminal",
       });
     }
   }
 
-  async updatePort(req, res) {
+  async updateTerminal(req, res) {
     try {
       // Check for validation errors
       const errors = validationResult(req);
@@ -270,80 +243,77 @@ class PortController {
       }
 
       const { id } = req.params;
-      const {
-        name,
-        portType,
-        countryId,
-        itaCode,
-        portCode,
-        customsDetails,
-        status,
-      } = req.body;
+      const { name, portId, status, description } = req.body;
 
-      // Check if port exists
-      const existingPort = await prisma.port.findUnique({
+      // Check if terminal exists
+      const existingTerminal = await prisma.terminal.findUnique({
         where: { id },
       });
 
-      if (!existingPort) {
+      if (!existingTerminal) {
         return res.status(404).json({
           success: false,
           error: "Not Found",
-          message: "Port not found",
+          message: "Terminal not found",
         });
       }
 
-      // Check if country exists if countryId is being updated
-      if (countryId && countryId !== existingPort.countryId) {
-        const country = await prisma.country.findUnique({
-          where: { id: countryId },
+      // Check if port exists if portId is being updated
+      if (portId && portId !== existingTerminal.portId) {
+        const port = await prisma.port.findUnique({
+          where: { id: portId },
         });
 
-        if (!country) {
+        if (!port) {
           return res.status(400).json({
             success: false,
             error: "Validation Error",
-            message: "Invalid country specified",
+            message: "Invalid port specified",
           });
         }
       }
 
-      // Check for duplicate port code if provided and different from current
-      if (portCode && portCode !== existingPort.portCode) {
-        const duplicatePort = await prisma.port.findFirst({
+      // Check for duplicate terminal name if provided and different from current
+      if (name && name !== existingTerminal.name) {
+        const duplicateTerminal = await prisma.terminal.findFirst({
           where: {
-            portCode,
+            name,
             NOT: { id },
           },
         });
 
-        if (duplicatePort) {
+        if (duplicateTerminal) {
           return res.status(409).json({
             success: false,
             error: "Conflict",
-            message: "Port code already exists",
+            message: "Terminal name already exists",
           });
         }
       }
 
-      const updatedPort = await prisma.port.update({
+      const updatedTerminal = await prisma.terminal.update({
         where: { id },
         data: {
           ...(name && { name }),
-          ...(portType && { portType }),
-          ...(countryId && { countryId }),
-          ...(itaCode !== undefined && { itaCode }),
-          ...(portCode !== undefined && { portCode }),
-          ...(customsDetails !== undefined && { customsDetails }),
+          ...(portId && { portId }),
           ...(status && { status }),
+          ...(description && { description }),
         },
         include: {
-          country: {
+          port: {
             select: {
               id: true,
               name: true,
-              codeChar2: true,
-              codeChar3: true,
+              portType: true,
+              portCode: true,
+              country: {
+                select: {
+                  id: true,
+                  name: true,
+                  codeChar2: true,
+                  codeChar3: true,
+                },
+              },
             },
           },
           createdBy: {
@@ -354,115 +324,94 @@ class PortController {
               email: true,
             },
           },
-          Terminal: {
-            select: {
-              id: true,
-              name: true,
-              status: true,
-            },
-          },
         },
       });
 
       res.json({
         success: true,
-        data: updatedPort,
-        message: "Port updated successfully",
+        data: updatedTerminal,
+        message: "Terminal updated successfully",
       });
     } catch (error) {
-      console.error("Error updating port:", error);
+      console.error("Error updating terminal:", error);
 
       // Handle Prisma unique constraint errors
       if (error.code === "P2002") {
         return res.status(409).json({
           success: false,
           error: "Conflict",
-          message: "A port with this information already exists",
+          message: "A terminal with this information already exists",
         });
       }
 
       res.status(500).json({
         success: false,
         error: "Internal Server Error",
-        message: "Failed to update port",
+        message: "Failed to update terminal",
       });
     }
   }
 
-  async deletePort(req, res) {
+  async deleteTerminal(req, res) {
     try {
       const { id } = req.params;
 
-      // Check if port exists
-      const existingPort = await prisma.port.findUnique({
+      // Check if terminal exists
+      const existingTerminal = await prisma.terminal.findUnique({
         where: { id },
-        include: {
-          Terminal: true,
-        },
       });
 
-      if (!existingPort) {
+      if (!existingTerminal) {
         return res.status(404).json({
           success: false,
           error: "Not Found",
-          message: "Port not found",
+          message: "Terminal not found",
         });
       }
 
-      // Check if port has associated terminals
-      if (existingPort.Terminal.length > 0) {
-        return res.status(400).json({
-          success: false,
-          error: "Validation Error",
-          message: "Cannot delete port with associated terminals",
-        });
-      }
-
-      await prisma.port.delete({
+      await prisma.terminal.delete({
         where: { id },
       });
 
       res.json({
         success: true,
-        message: "Port deleted successfully",
+        message: "Terminal deleted successfully",
       });
     } catch (error) {
-      console.error("Error deleting port:", error);
+      console.error("Error deleting terminal:", error);
 
       // Handle foreign key constraint errors
       if (error.code === "P2003") {
         return res.status(400).json({
           success: false,
           error: "Constraint Error",
-          message: "Cannot delete port due to existing relationships",
+          message: "Cannot delete terminal due to existing relationships",
         });
       }
 
       res.status(500).json({
         success: false,
         error: "Internal Server Error",
-        message: "Failed to delete port",
+        message: "Failed to delete terminal",
       });
     }
   }
 
-  async getPortsByCountry(req, res) {
+  async getTerminalsByPort(req, res) {
     try {
-      const { countryId } = req.params;
+      const { portId } = req.params;
 
-      const ports = await prisma.port.findMany({
+      const terminals = await prisma.terminal.findMany({
         where: {
-          countryId,
+          portId,
           status: "ACTIVE",
         },
         include: {
-          Terminal: {
-            where: {
-              status: "ACTIVE",
-            },
+          port: {
             select: {
               id: true,
               name: true,
+              portType: true,
             },
           },
         },
@@ -473,17 +422,17 @@ class PortController {
 
       res.json({
         success: true,
-        data: ports,
+        data: terminals,
       });
     } catch (error) {
-      console.error("Error fetching ports by country:", error);
+      console.error("Error fetching terminals by port:", error);
       res.status(500).json({
         success: false,
         error: "Internal Server Error",
-        message: "Failed to fetch ports by country",
+        message: "Failed to fetch terminals by port",
       });
     }
   }
 }
 
-module.exports = new PortController();
+module.exports = new TerminalController();

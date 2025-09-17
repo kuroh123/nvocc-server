@@ -126,8 +126,9 @@ const authorize = (...requiredRoles) => {
     if (requiredRoles.length === 0) {
       return next();
     }
-
+    console.log("$$$$$", req.user.roles, ...requiredRoles);
     const userRoles = req.user.roles || [];
+    requiredRoles = requiredRoles.flat();
     const hasRequiredRole = requiredRoles.some((role) =>
       userRoles.includes(role)
     );
@@ -231,7 +232,9 @@ const optionalAuth = async (req, res, next) => {
 
 module.exports = {
   authenticate,
+  authenticateToken: authenticate,
   authorize,
+  requireRoles: authorize,
   requirePermission,
   requireActiveRole,
   optionalAuth,

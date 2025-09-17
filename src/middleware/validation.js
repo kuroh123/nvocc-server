@@ -174,4 +174,312 @@ const authValidation = {
   ],
 };
 
-module.exports = authValidation;
+const portValidation = {
+  // Validation for port creation
+  create: [
+    body("name")
+      .trim()
+      .notEmpty()
+      .withMessage("Port name is required")
+      .isLength({ min: 2, max: 100 })
+      .withMessage("Port name must be between 2 and 100 characters"),
+
+    body("portType")
+      .notEmpty()
+      .withMessage("Port type is required")
+      .isIn(["DRY_PORT", "SEA_PORT"])
+      .withMessage("Port type must be either DRY_PORT or SEA_PORT"),
+
+    body("countryId")
+      .notEmpty()
+      .withMessage("Country ID is required")
+      .isString()
+      .withMessage("Country ID must be a valid string"),
+
+    body("itaCode")
+      .optional()
+      .trim()
+      .isLength({ max: 10 })
+      .withMessage("ITA code must not exceed 10 characters"),
+
+    body("portCode")
+      .optional()
+      .trim()
+      .isLength({ max: 20 })
+      .withMessage("Port code must not exceed 20 characters")
+      .matches(/^[A-Z0-9]+$/)
+      .withMessage("Port code must contain only uppercase letters and numbers"),
+
+    body("customsDetails")
+      .optional()
+      .trim()
+      .isLength({ max: 500 })
+      .withMessage("Customs details must not exceed 500 characters"),
+
+    body("status")
+      .optional()
+      .isIn(["ACTIVE", "INACTIVE", "SUSPENDED"])
+      .withMessage("Status must be ACTIVE, INACTIVE, or SUSPENDED"),
+  ],
+
+  // Validation for port update
+  update: [
+    param("id")
+      .notEmpty()
+      .withMessage("Port ID is required")
+      .isString()
+      .withMessage("Port ID must be a valid string"),
+
+    body("name")
+      .optional()
+      .trim()
+      .notEmpty()
+      .withMessage("Port name cannot be empty")
+      .isLength({ min: 2, max: 100 })
+      .withMessage("Port name must be between 2 and 100 characters"),
+
+    body("portType")
+      .optional()
+      .isIn(["DRY_PORT", "SEA_PORT"])
+      .withMessage("Port type must be either DRY_PORT or SEA_PORT"),
+
+    body("countryId")
+      .optional()
+      .isString()
+      .withMessage("Country ID must be a valid string"),
+
+    body("itaCode")
+      .optional()
+      .trim()
+      .isLength({ max: 10 })
+      .withMessage("ITA code must not exceed 10 characters"),
+
+    body("portCode")
+      .optional()
+      .trim()
+      .isLength({ max: 20 })
+      .withMessage("Port code must not exceed 20 characters")
+      .matches(/^[A-Z0-9]*$/)
+      .withMessage("Port code must contain only uppercase letters and numbers"),
+
+    body("customsDetails")
+      .optional()
+      .trim()
+      .isLength({ max: 500 })
+      .withMessage("Customs details must not exceed 500 characters"),
+
+    body("status")
+      .optional()
+      .isIn(["ACTIVE", "INACTIVE", "SUSPENDED"])
+      .withMessage("Status must be ACTIVE, INACTIVE, or SUSPENDED"),
+  ],
+
+  // Validation for getting port by ID
+  getById: [
+    param("id")
+      .notEmpty()
+      .withMessage("Port ID is required")
+      .isString()
+      .withMessage("Port ID must be a valid string"),
+  ],
+
+  // Validation for delete port
+  delete: [
+    param("id")
+      .notEmpty()
+      .withMessage("Port ID is required")
+      .isString()
+      .withMessage("Port ID must be a valid string"),
+  ],
+
+  // Validation for get ports by country
+  getByCountry: [
+    param("countryId")
+      .notEmpty()
+      .withMessage("Country ID is required")
+      .isString()
+      .withMessage("Country ID must be a valid string"),
+  ],
+
+  // Validation for query parameters in getAllPorts
+  getAll: [
+    query("page")
+      .optional()
+      .isInt({ min: 1 })
+      .withMessage("Page must be a positive integer"),
+
+    query("limit")
+      .optional()
+      .isInt({ min: 1, max: 100 })
+      .withMessage("Limit must be between 1 and 100"),
+
+    query("search")
+      .optional()
+      .trim()
+      .isLength({ max: 100 })
+      .withMessage("Search term must not exceed 100 characters"),
+
+    query("status")
+      .optional()
+      .isIn(["ACTIVE", "INACTIVE", "SUSPENDED"])
+      .withMessage("Status must be ACTIVE, INACTIVE, or SUSPENDED"),
+
+    query("portType")
+      .optional()
+      .isIn(["DRY_PORT", "SEA_PORT"])
+      .withMessage("Port type must be either DRY_PORT or SEA_PORT"),
+
+    query("countryId")
+      .optional()
+      .isString()
+      .withMessage("Country ID must be a valid string"),
+  ],
+};
+
+const countryValidation = {
+  // Validation for getting country by ID
+  getById: [
+    param("id")
+      .notEmpty()
+      .withMessage("Country ID is required")
+      .isString()
+      .withMessage("Country ID must be a valid string"),
+  ],
+
+  // Validation for query parameters in getAllCountries
+  getAll: [
+    query("page")
+      .optional()
+      .isInt({ min: 1 })
+      .withMessage("Page must be a positive integer"),
+
+    query("limit")
+      .optional()
+      .isInt({ min: 1, max: 100 })
+      .withMessage("Limit must be between 1 and 100"),
+
+    query("search")
+      .optional()
+      .trim()
+      .isLength({ max: 100 })
+      .withMessage("Search term must not exceed 100 characters"),
+
+    query("status")
+      .optional()
+      .isIn(["ACTIVE", "INACTIVE", "SUSPENDED"])
+      .withMessage("Status must be ACTIVE, INACTIVE, or SUSPENDED"),
+  ],
+};
+
+const terminalValidation = {
+  // Validation for terminal creation
+  create: [
+    body("name")
+      .trim()
+      .notEmpty()
+      .withMessage("Terminal name is required")
+      .isLength({ min: 2, max: 100 })
+      .withMessage("Terminal name must be between 2 and 100 characters"),
+
+    body("portId")
+      .notEmpty()
+      .withMessage("Port ID is required")
+      .isString()
+      .withMessage("Port ID must be a valid string"),
+
+    body("status")
+      .optional()
+      .isIn(["ACTIVE", "INACTIVE", "SUSPENDED"])
+      .withMessage("Status must be ACTIVE, INACTIVE, or SUSPENDED"),
+  ],
+
+  // Validation for terminal update
+  update: [
+    param("id")
+      .notEmpty()
+      .withMessage("Terminal ID is required")
+      .isString()
+      .withMessage("Terminal ID must be a valid string"),
+
+    body("name")
+      .optional()
+      .trim()
+      .notEmpty()
+      .withMessage("Terminal name cannot be empty")
+      .isLength({ min: 2, max: 100 })
+      .withMessage("Terminal name must be between 2 and 100 characters"),
+
+    body("portId")
+      .optional()
+      .isString()
+      .withMessage("Port ID must be a valid string"),
+
+    body("status")
+      .optional()
+      .isIn(["ACTIVE", "INACTIVE", "SUSPENDED"])
+      .withMessage("Status must be ACTIVE, INACTIVE, or SUSPENDED"),
+  ],
+
+  // Validation for getting terminal by ID
+  getById: [
+    param("id")
+      .notEmpty()
+      .withMessage("Terminal ID is required")
+      .isString()
+      .withMessage("Terminal ID must be a valid string"),
+  ],
+
+  // Validation for delete terminal
+  delete: [
+    param("id")
+      .notEmpty()
+      .withMessage("Terminal ID is required")
+      .isString()
+      .withMessage("Terminal ID must be a valid string"),
+  ],
+
+  // Validation for get terminals by port
+  getByPort: [
+    param("portId")
+      .notEmpty()
+      .withMessage("Port ID is required")
+      .isString()
+      .withMessage("Port ID must be a valid string"),
+  ],
+
+  // Validation for query parameters in getAllTerminals
+  getAll: [
+    query("page")
+      .optional()
+      .isInt({ min: 1 })
+      .withMessage("Page must be a positive integer"),
+
+    query("limit")
+      .optional()
+      .isInt({ min: 1, max: 100 })
+      .withMessage("Limit must be between 1 and 100"),
+
+    query("search")
+      .optional()
+      .trim()
+      .isLength({ max: 100 })
+      .withMessage("Search term must not exceed 100 characters"),
+
+    query("status")
+      .optional()
+      .isIn(["ACTIVE", "INACTIVE", "SUSPENDED"])
+      .withMessage("Status must be ACTIVE, INACTIVE, or SUSPENDED"),
+
+    query("portId")
+      .optional()
+      .isString()
+      .withMessage("Port ID must be a valid string"),
+  ],
+};
+
+module.exports = {
+  authValidation,
+  portValidation,
+  countryValidation,
+  terminalValidation,
+};
