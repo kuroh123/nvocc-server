@@ -13,6 +13,11 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum PortType {
+  DRY_PORT
+  SEA_PORT
+}
+
 enum RoleType {
   ADMIN
   CUSTOMER
@@ -23,170 +28,222 @@ enum RoleType {
   HR
 }
 
-enum UserStatus {
+enum Status {
   ACTIVE
   INACTIVE
   SUSPENDED
 }
 
-model User {
-  id                String           @id @default(cuid())
-  email             String           @unique
-  password          String
-  firstName         String?
-  lastName          String?
-  phoneNumber       String?
-  status            UserStatus       @default(ACTIVE)
-  isEmailVerified   Boolean          @default(false)
-  emailVerifiedAt   DateTime?
-  lastLoginAt       DateTime?
-  profileImageUrl   String?
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-  
+model Tenant {
+  id                          String   @id @default(cuid())
+  name                        String
+  app_abbr                    String   @unique
+  website_url                 String?
+  email                       String
+  activation                  Boolean  @default(true)
+  resend_activation_threshold Int      @default(3)
+  language                    String   @default("en")
+  template                    String   @default("default")
+  app_version                 String   @default("1.0.0")
+  app_status                  String   @default("active")
+  app_msg                     String?
+  prefix_booking              String   @default("BKG")
+  prefix_bl                   String   @default("BL")
+  password_expiry_days        Int      @default(90)
+  max_user_sessions           Int      @default(5)
+  booking_confirmation_text   String?
+  currency_converter_api_key  String?
+  audit_trail_anyoperation    Boolean  @default(true)
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+
   // Relations
-  userRoles         UserRole[]
-  userSessions      UserSession[]
-  refreshTokens     RefreshToken[]
-  passwordResets    PasswordReset[]
-  activityLogs      ActivityLog[]
-  
+  users User[]
+
+  @@map("tenants")
+}
+
+model User {
+  id              String    @id @default(cuid())
+  tenantId        String
+  email           String    @unique
+  password        String
+  firstName       String?
+  lastName        String?
+  phoneNumber     String?
+  status          Status    @default(ACTIVE)
+  isEmailVerified Boolean   @default(false)
+  emailVerifiedAt DateTime?
+  lastLoginAt     DateTime?
+  profileImageUrl String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  roles          Role[]
+  userSessions   UserSession[]
+  refreshTokens  RefreshToken[]
+  passwordResets PasswordReset[]
+  activityLogs   ActivityLog[]
+  Port           Port[]
+  Terminal       Terminal[]
+
   @@map("users")
 }
 
 model Role {
-  id                String           @id @default(cuid())
-  name              RoleType         @unique
-  displayName       String
-  description       String?
-  permissions       String[]         // JSON array of permission strings
-  isActive          Boolean          @default(true)
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-  
+  id          String   @id @default(cuid())
+  name        RoleType @unique
+  displayName String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
   // Relations
-  userRoles         UserRole[]
-  roleMenus         RoleMenu[]
-  
+  users       User[]
+  permissions Permission[]
+
   @@map("roles")
 }
 
-model UserRole {
-  id                String           @id @default(cuid())
-  userId            String
-  roleId            String
-  isActive          Boolean          @default(true)
-  assignedAt        DateTime         @default(now())
-  assignedBy        String?          // User ID who assigned this role
-  revokedAt         DateTime?
-  revokedBy         String?          // User ID who revoked this role
-  
+model Permission {
+  id          String   @id @default(cuid())
+  name        String   @unique // e.g., "bookings.create"
+  displayName String // e.g., "Create Bookings"
+  description String?
+  module      String // e.g., "bookings", "users", "reports"
+  category    String? // e.g., "read", "write", "admin"
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
   // Relations
-  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role              Role             @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  
-  @@unique([userId, roleId])
-  @@map("user_roles")
+  roles Role[]
+
+  @@map("permissions")
 }
 
 model UserSession {
-  id                String           @id @default(cuid())
-  userId            String
-  token             String           @unique
-  activeRole        RoleType?        // Current active role in this session
-  ipAddress         String?
-  userAgent         String?
-  isActive          Boolean          @default(true)
-  expiresAt         DateTime
-  createdAt         DateTime         @default(now())
-  lastActivityAt    DateTime         @default(now())
-  
+  id             String    @id @default(cuid())
+  userId         String
+  token          String    @unique
+  activeRole     RoleType? // Current active role in this session
+  ipAddress      String?
+  userAgent      String?
+  isActive       Boolean   @default(true)
+  expiresAt      DateTime
+  createdAt      DateTime  @default(now())
+  lastActivityAt DateTime  @default(now())
+
   // Relations
-  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@map("user_sessions")
 }
 
 model RefreshToken {
-  id                String           @id @default(cuid())
-  userId            String
-  token             String           @unique
-  isRevoked         Boolean          @default(false)
-  expiresAt         DateTime
-  createdAt         DateTime         @default(now())
-  
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  isRevoked Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
   // Relations
-  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@map("refresh_tokens")
 }
 
 model PasswordReset {
-  id                String           @id @default(cuid())
-  userId            String
-  token             String           @unique
-  isUsed            Boolean          @default(false)
-  expiresAt         DateTime
-  createdAt         DateTime         @default(now())
-  usedAt            DateTime?
-  
+  id        String    @id @default(cuid())
+  userId    String
+  token     String    @unique
+  isUsed    Boolean   @default(false)
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  usedAt    DateTime?
+
   // Relations
-  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@map("password_resets")
 }
 
-model Menu {
-  id                String           @id @default(cuid())
-  name              String
-  displayName       String
-  path              String?
-  icon              String?
-  parentId          String?
-  sortOrder         Int              @default(0)
-  isActive          Boolean          @default(true)
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-  
-  // Relations
-  parent            Menu?            @relation("MenuHierarchy", fields: [parentId], references: [id])
-  children          Menu[]           @relation("MenuHierarchy")
-  roleMenus         RoleMenu[]
-  
-  @@map("menus")
+// Application Data Models
+
+model Country {
+  id              String   @id @default(cuid())
+  name            String
+  codeChar2       String   @unique
+  codeChar3       String   @unique
+  unRegion        String?
+  unSubregion     String?
+  currencyId      String?
+  invoiceRoundOff String?
+  status          Status   @default(ACTIVE)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  Port            Port[]
+
+  @@map("countries")
 }
 
-model RoleMenu {
-  id                String           @id @default(cuid())
-  roleId            String
-  menuId            String
-  canView           Boolean          @default(true)
-  canCreate         Boolean          @default(false)
-  canEdit           Boolean          @default(false)
-  canDelete         Boolean          @default(false)
-  createdAt         DateTime         @default(now())
-  
+model Port {
+  id             String   @id @default(cuid())
+  name           String
+  portType       PortType
+  status         Status   @default(ACTIVE)
+  countryId      String
+  itaCode        String?
+  portCode       String?
+  customsDetails String?
+  createdById    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
   // Relations
-  role              Role             @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  menu              Menu             @relation(fields: [menuId], references: [id], onDelete: Cascade)
-  
-  @@unique([roleId, menuId])
-  @@map("role_menus")
+  country   Country    @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  createdBy User?      @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  Terminal  Terminal[]
+
+  @@map("ports")
 }
+
+model Terminal {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  portId      String
+  status      Status   @default(ACTIVE)
+  description String?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  port      Port  @relation(fields: [portId], references: [id], onDelete: Cascade)
+  createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@map("terminals")
+}
+
+// Audit Trail / Activity Log
 
 model ActivityLog {
-  id                String           @id @default(cuid())
-  userId            String?
-  action            String           // LOGIN, LOGOUT, ROLE_SWITCH, etc.
-  entity            String?          // What was affected
-  entityId          String?          // ID of affected entity
-  details           Json?            // Additional details
-  ipAddress         String?
-  userAgent         String?
-  createdAt         DateTime         @default(now())
-  
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String // LOGIN, LOGOUT, ROLE_SWITCH, etc.
+  entity    String? // What was affected
+  entityId  String? // ID of affected entity
+  details   Json? // Additional details
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
   // Relations
-  user              User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
-  
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
   @@map("activity_logs")
 }

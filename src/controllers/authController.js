@@ -114,8 +114,6 @@ class AuthController {
         message: "Role switched successfully",
         data: {
           user: result.user,
-          accessToken: result.tokens.accessToken,
-          expiresIn: result.tokens.expiresIn,
         },
       });
     } catch (error) {
@@ -248,26 +246,26 @@ class AuthController {
   }
 
   /**
-   * Get user's menus based on active role
+   * Get user's permissions based on active role
    */
-  async getMenus(req, res) {
+  async getPermissions(req, res) {
     try {
-      const menus = req.user.menus || [];
+      const permissions = req.user.permissions || [];
 
       res.json({
         success: true,
-        message: "Menus retrieved successfully",
+        message: "Permissions retrieved successfully",
         data: {
-          menus,
+          permissions,
           activeRole: req.user.activeRole,
         },
       });
     } catch (error) {
-      console.error("Get menus error:", error);
+      console.error("Get permissions error:", error);
       res.status(500).json({
         success: false,
-        message: "Failed to retrieve menus",
-        code: "MENUS_FETCH_FAILED",
+        message: "Failed to retrieve permissions",
+        code: "PERMISSIONS_FETCH_FAILED",
       });
     }
   }

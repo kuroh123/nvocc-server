@@ -15,7 +15,7 @@ app.set("trust proxy", 1);
 // CORS configuration
 app.use(
   cors({
-    origin: process.env.WEBSITE_URL || "http://localhost:3000",
+    origin: true, // Allow all origins
     credentials: true,
   })
 );
@@ -42,6 +42,9 @@ app.get("/health", (req, res) => {
 
 // API Routes
 app.use("/api/auth", require("./routes/auth"));
+app.use("/api/countries", require("./routes/country"));
+app.use("/api/ports", require("./routes/port"));
+app.use("/api/terminals", require("./routes/terminal"));
 app.use("/api/test", require("./routes/test"));
 
 // 404 handler for API routes - Express v5 compatible with proper regex

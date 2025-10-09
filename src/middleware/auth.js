@@ -24,18 +24,9 @@ const authenticate = async (req, res, next) => {
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
       include: {
-        userRoles: {
-          where: { isActive: true },
+        roles: {
           include: {
-            role: {
-              include: {
-                roleMenus: {
-                  include: {
-                    menu: true,
-                  },
-                },
-              },
-            },
+            permissions: true,
           },
         },
       },
@@ -90,22 +81,19 @@ const authenticate = async (req, res, next) => {
       firstName: user.firstName,
       lastName: user.lastName,
       status: user.status,
-      roles: user.userRoles.map((ur) => ur.role.name),
+      roles: user.roles.map((role) => role.name),
       activeRole:
         decoded.activeRole ||
-        (user.userRoles.length > 0 ? user.userRoles[0].role.name : null),
-      permissions: user.userRoles.flatMap((ur) => ur.role.permissions || []),
-      menus: user.userRoles.flatMap((ur) =>
-        ur.role.roleMenus.map((rm) => ({
-          ...rm.menu,
-          permissions: {
-            canView: rm.canView,
-            canCreate: rm.canCreate,
-            canEdit: rm.canEdit,
-            canDelete: rm.canDelete,
-          },
-        }))
-      ),
+        (user.roles.length > 0 ? user.roles[0].name : null),
+      permissions: [
+        ...new Set(
+          user.roles.flatMap((role) =>
+            role.permissions
+              .filter((permission) => permission.isActive)
+              .map((permission) => permission.name)
+          )
+        ),
+      ],
     };
 
     req.session = activeSession;
@@ -138,8 +126,9 @@ const authorize = (...requiredRoles) => {
     if (requiredRoles.length === 0) {
       return next();
     }
-
+    console.log("$$$$$", req.user.roles, ...requiredRoles);
     const userRoles = req.user.roles || [];
+    requiredRoles = requiredRoles.flat();
     const hasRequiredRole = requiredRoles.some((role) =>
       userRoles.includes(role)
     );
@@ -243,7 +232,9 @@ const optionalAuth = async (req, res, next) => {
 
 module.exports = {
   authenticate,
+  authenticateToken: authenticate,
   authorize,
+  requireRoles: authorize,
   requirePermission,
   requireActiveRole,
   optionalAuth,

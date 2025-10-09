@@ -45,20 +45,12 @@ class AuthService {
         firstName,
         lastName,
         phoneNumber,
-        userRoles: {
-          create: roles.map((roleName) => ({
-            role: {
-              connect: { name: roleName },
-            },
-          })),
+        roles: {
+          connect: roles.map((roleName) => ({ name: roleName })),
         },
       },
       include: {
-        userRoles: {
-          include: {
-            role: true,
-          },
-        },
+        roles: true,
       },
     });
 
@@ -73,7 +65,7 @@ class AuthService {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      roles: user.userRoles.map((ur) => ur.role.name),
+      roles: user.roles.map((role) => role.name),
     };
   }
 
@@ -85,23 +77,16 @@ class AuthService {
     const user = await prisma.user.findUnique({
       where: { email },
       include: {
-        userRoles: {
-          where: { isActive: true },
+        tenant: true,
+        roles: {
           include: {
-            role: {
-              include: {
-                roleMenus: {
-                  include: {
-                    menu: true,
-                  },
-                },
-              },
-            },
+            permissions: true,
           },
         },
       },
     });
 
+    console.log("User attempting login:", user ? user : "Not found");
     if (!user) {
       await this.logActivity(
         null,
@@ -159,8 +144,7 @@ class AuthService {
     }
 
     // Get default active role (first role if multiple)
-    const defaultRole =
-      user.userRoles.length > 0 ? user.userRoles[0].role.name : null;
+    const defaultRole = user.roles.length > 0 ? user.roles[0].name : null;
 
     // Generate tokens
     const { accessToken, refreshToken, expiresIn } = jwtUtils.generateTokenPair(
@@ -213,13 +197,14 @@ class AuthService {
     return {
       user: {
         id: user.id,
+        tenant: user.tenant ? user.tenant : null,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
         status: user.status,
-        roles: user.userRoles.map((ur) => ur.role.name),
+        roles: user.roles.map((role) => role.name),
         activeRole: defaultRole,
-        menus: this.getMenusForRoles(user.userRoles),
+        permissions: this.getPermissionsForRoles(user.roles),
       },
       tokens: {
         accessToken,
@@ -237,72 +222,35 @@ class AuthService {
    * Switch user's active role
    */
   async switchRole(userId, newRole, sessionId) {
-    // Verify user has access to the requested role
-    const userRole = await prisma.userRole.findFirst({
-      where: {
-        userId,
-        isActive: true,
-        role: { name: newRole },
-      },
-      include: {
-        role: {
-          include: {
-            roleMenus: {
-              include: {
-                menu: true,
-              },
-            },
-          },
-        },
-      },
-    });
-
-    if (!userRole) {
-      throw new Error("User does not have access to this role");
-    }
-
-    // Get user with all roles for token generation
+    // Get user with all roles for verification
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
-        userRoles: {
-          where: { isActive: true },
+        roles: {
           include: {
-            role: {
-              include: {
-                roleMenus: {
-                  include: {
-                    menu: true,
-                  },
-                },
-              },
-            },
+            permissions: true,
           },
         },
       },
     });
 
-    // Generate new token with new active role
-    const { accessToken, expiresIn } = jwtUtils.generateTokenPair(
-      user,
-      newRole
-    );
+    if (!user) {
+      throw new Error("User not found");
+    }
 
-    // Update session
-    const updatedSession = await prisma.userSession.update({
-      where: { id: sessionId },
-      data: {
-        token: accessToken,
-        activeRole: newRole,
-        expiresAt: jwtUtils.getExpirationDate(expiresIn),
-        lastActivityAt: new Date(),
-      },
-    });
+    // Verify user has access to the requested role
+    const hasRole = user.roles.some((role) => role.name === newRole);
+
+    if (!hasRole) {
+      throw new Error("User does not have access to this role");
+    }
+
+    // Get the specific role data
+    const roleData = user.roles.find((role) => role.name === newRole);
 
     // Log role switch
     await this.logActivity(userId, "ROLE_SWITCH", "UserSession", sessionId, {
       newRole,
-      previousRole: updatedSession.activeRole,
     });
 
     return {
@@ -311,13 +259,9 @@ class AuthService {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
-        roles: user.userRoles.map((ur) => ur.role.name),
+        roles: user.roles.map((role) => role.name),
         activeRole: newRole,
-        menus: this.getMenusForRole(userRole.role),
-      },
-      tokens: {
-        accessToken,
-        expiresIn,
+        permissions: this.getPermissionsForRole(roleData),
       },
     };
   }
@@ -340,12 +284,7 @@ class AuthService {
       include: {
         user: {
           include: {
-            userRoles: {
-              where: { isActive: true },
-              include: {
-                role: true,
-              },
-            },
+            roles: true,
           },
         },
       },
@@ -372,7 +311,7 @@ class AuthService {
 
     const activeRole =
       currentSession?.activeRole ||
-      (user.userRoles.length > 0 ? user.userRoles[0].role.name : null);
+      (user.roles.length > 0 ? user.roles[0].name : null);
 
     // Generate new access token
     const { accessToken, expiresIn } = jwtUtils.generateTokenPair(
@@ -429,18 +368,9 @@ class AuthService {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
-        userRoles: {
-          where: { isActive: true },
+        roles: {
           include: {
-            role: {
-              include: {
-                roleMenus: {
-                  include: {
-                    menu: true,
-                  },
-                },
-              },
-            },
+            permissions: true,
           },
         },
       },
@@ -460,71 +390,40 @@ class AuthService {
       isEmailVerified: user.isEmailVerified,
       lastLoginAt: user.lastLoginAt,
       profileImageUrl: user.profileImageUrl,
-      roles: user.userRoles.map((ur) => ({
-        id: ur.role.id,
-        name: ur.role.name,
-        displayName: ur.role.displayName,
-        assignedAt: ur.assignedAt,
+      roles: user.roles.map((role) => ({
+        id: role.id,
+        name: role.name,
+        displayName: role.displayName,
       })),
-      menus: this.getMenusForRoles(user.userRoles),
+      permissions: this.getPermissionsForRoles(user.roles),
     };
   }
 
   /**
-   * Helper method to extract menus for multiple roles
+   * Helper method to extract permissions for multiple roles
    */
-  getMenusForRoles(userRoles) {
-    const menuMap = new Map();
+  getPermissionsForRoles(roles) {
+    const permissionSet = new Set();
 
-    userRoles.forEach((userRole) => {
-      userRole.role.roleMenus.forEach((roleMenu) => {
-        const menuId = roleMenu.menu.id;
-        const existingMenu = menuMap.get(menuId);
-
-        if (!existingMenu) {
-          menuMap.set(menuId, {
-            ...roleMenu.menu,
-            permissions: {
-              canView: roleMenu.canView,
-              canCreate: roleMenu.canCreate,
-              canEdit: roleMenu.canEdit,
-              canDelete: roleMenu.canDelete,
-            },
-          });
-        } else {
-          // Merge permissions (OR operation - if any role has permission, user has it)
-          existingMenu.permissions.canView =
-            existingMenu.permissions.canView || roleMenu.canView;
-          existingMenu.permissions.canCreate =
-            existingMenu.permissions.canCreate || roleMenu.canCreate;
-          existingMenu.permissions.canEdit =
-            existingMenu.permissions.canEdit || roleMenu.canEdit;
-          existingMenu.permissions.canDelete =
-            existingMenu.permissions.canDelete || roleMenu.canDelete;
+    roles.forEach((role) => {
+      role.permissions.forEach((permission) => {
+        if (permission.isActive) {
+          permissionSet.add(permission.name);
         }
       });
     });
 
-    return Array.from(menuMap.values()).sort(
-      (a, b) => a.sortOrder - b.sortOrder
-    );
+    return Array.from(permissionSet).sort();
   }
 
   /**
-   * Helper method to extract menus for a single role
+   * Helper method to extract permissions for a single role
    */
-  getMenusForRole(role) {
-    return role.roleMenus
-      .map((roleMenu) => ({
-        ...roleMenu.menu,
-        permissions: {
-          canView: roleMenu.canView,
-          canCreate: roleMenu.canCreate,
-          canEdit: roleMenu.canEdit,
-          canDelete: roleMenu.canDelete,
-        },
-      }))
-      .sort((a, b) => a.sortOrder - b.sortOrder);
+  getPermissionsForRole(role) {
+    return role.permissions
+      .filter((permission) => permission.isActive)
+      .map((permission) => permission.name)
+      .sort();
   }
 
   /**
