@@ -58,7 +58,7 @@ class PortController {
                 email: true,
               },
             },
-            Terminal: {
+            terminals: {
               select: {
                 id: true,
                 name: true,

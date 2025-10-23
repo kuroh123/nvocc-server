@@ -34,6 +34,43 @@ enum Status {
   SUSPENDED
 }
 
+enum CargoType {
+  GENERAL
+  HAZARDOUS
+  REFRIGERATED
+  BULK
+  LIQUID
+}
+
+enum ContainerTypeCategory {
+  DRY
+  REEFER
+  TANK
+  FLAT_RACK
+  OPEN_TOP
+}
+
+enum VesselType {
+  CONTAINER_SHIP
+  BULK_CARRIER
+  TANKER
+  RO_RO
+  GENERAL_CARGO
+}
+
+enum EventType {
+  PICKUP
+  DELIVERY
+  TRANSIT
+  STORAGE
+}
+
+enum ProductType {
+  EXPORT
+  IMPORT
+  TRANSSHIPMENT
+}
+
 model Tenant {
   id                          String   @id @default(cuid())
   name                        String
@@ -174,6 +211,322 @@ model PasswordReset {
 
 // Application Data Models
 
+model Currency {
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique // USD, EUR, INR, etc.
+  symbol    String?  // $, €, ₹, etc.
+  status    Status   @default(ACTIVE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  countries          Country[]
+  bankAccounts       BankAccount[]
+  exchangeRatesFrom  CurrencyExchangeRate[] @relation("FromCurrency")
+  exchangeRatesTo    CurrencyExchangeRate[] @relation("ToCurrency")
+
+  @@map("currencies")
+}
+
+model State {
+  id        String   @id @default(cuid())
+  name      String
+  code      String?
+  countryId String
+  status    Status   @default(ACTIVE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  country      Country       @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  agents       Agent[]
+  bankAccounts BankAccount[]
+  operators    Operator[]
+  depots       Depot[]
+
+  @@map("states")
+}
+
+model Agent {
+  id                  String   @id @default(cuid())
+  name                String
+  companyName         String
+  ownOffice           Boolean  @default(false)
+  status              Status   @default(ACTIVE)
+  portId              String?
+  email               String   @unique
+  addressLine1        String?
+  addressLine2        String?
+  city                String?
+  stateId             String?
+  zipCode             String?
+  countryId           String?
+  address             String?
+  mobNum              String?
+  telNum              String?
+  licenceNum          String?
+  expContactDetails   String?
+  impContactDetails   String?
+  gstNum              String?
+  panNum              String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  // Relations
+  port         Port?         @relation(fields: [portId], references: [id], onDelete: SetNull)
+  state        State?        @relation(fields: [stateId], references: [id], onDelete: SetNull)
+  country      Country?      @relation(fields: [countryId], references: [id], onDelete: SetNull)
+  bankAccounts BankAccount[]
+  pickupTariffs Tariff[] @relation("PickupAgent")
+  nextTariffs   Tariff[] @relation("NextAgent")
+
+  @@map("agents")
+}
+
+model Charge {
+  id          String   @id @default(cuid())
+  name        String
+  displayName String
+  status      Status   @default(ACTIVE)
+  sacHsnCode  String?
+  flag        String?
+  note        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("charges")
+}
+
+model CurrencyExchangeRate {
+  id             String   @id @default(cuid())
+  status         Status   @default(ACTIVE)
+  fromCurrencyId String
+  toCurrencyId   String
+  exchangeRate   Float
+  lowerRate      Float?
+  upperRate      Float?
+  validFromDt    DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  fromCurrency Currency @relation("FromCurrency", fields: [fromCurrencyId], references: [id], onDelete: Cascade)
+  toCurrency   Currency @relation("ToCurrency", fields: [toCurrencyId], references: [id], onDelete: Cascade)
+
+  @@map("currency_exchange_rates")
+}
+
+model Vessel {
+  id        String     @id @default(cuid())
+  name      String
+  type      VesselType
+  status    Status     @default(ACTIVE)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  // Relations
+  schedules VesselSchedule[]
+
+  @@map("vessels")
+}
+
+model VesselSchedule {
+  id                    String    @id @default(cuid())
+  vesselId              String
+  voyage                String?
+  serviceName           String?
+  gateOpen              DateTime?
+  cutOff                DateTime?
+  pickupLocation        String?
+  pickupTerminalId      String?
+  etaDt                 DateTime?
+  etdDt                 DateTime?
+  nextPortLocation      String?
+  nextPortTerminalId    String?
+  nextPortArrivalDt     DateTime?
+  pcNum                 String?
+  pcDt                  DateTime?
+  sobDt                 DateTime?
+  ataDt                 DateTime?
+  sobDescription        String?
+  ataDescription        String?
+  imNum                 String?
+  imDt                  DateTime?
+  imoCode               String?
+  callSign              String?
+  lineCode              String?
+  lineIgmNum            String?
+  lineIgmDt             DateTime?
+  space20ft             Int?
+  space40ft             Int?
+  tba                   String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  vessel             Vessel    @relation(fields: [vesselId], references: [id], onDelete: Cascade)
+  pickupTerminal     Terminal? @relation("PickupTerminal", fields: [pickupTerminalId], references: [id], onDelete: SetNull)
+  nextPortTerminal   Terminal? @relation("NextPortTerminal", fields: [nextPortTerminalId], references: [id], onDelete: SetNull)
+
+  @@map("vessel_schedules")
+}
+
+model Cargo {
+  id         String     @id @default(cuid())
+  name       String
+  status     Status     @default(ACTIVE)
+  cargoType  CargoType
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  // Relations
+  commodities Commodity[]
+
+  @@map("cargo")
+}
+
+model Commodity {
+  id          String   @id @default(cuid())
+  name        String
+  cargoId     String
+  description String?
+  status      Status   @default(ACTIVE)
+  code        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  cargo Cargo @relation(fields: [cargoId], references: [id], onDelete: Cascade)
+
+  @@map("commodities")
+}
+
+model ContainerType {
+  id        String                  @id @default(cuid())
+  name      String
+  isoCode   String                  @unique
+  type      ContainerTypeCategory
+  status    Status                  @default(ACTIVE)
+  notes     String?
+  createdAt DateTime                @default(now())
+  updatedAt DateTime                @updatedAt
+
+  // Relations
+  tariffs Tariff[]
+
+  @@map("container_types")
+}
+
+model BankAccount {
+  id           String   @id @default(cuid())
+  agentId      String
+  accountName  String
+  bankName     String
+  bankBranch   String?
+  currencyId   String
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  stateId      String?
+  zipCode      String?
+  countryId    String?
+  ifscCode     String?
+  swiftCode    String?
+  accountNum   String
+  status       Status   @default(ACTIVE)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  agent    Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  currency Currency  @relation(fields: [currencyId], references: [id], onDelete: Restrict)
+  state    State?    @relation(fields: [stateId], references: [id], onDelete: SetNull)
+  country  Country?  @relation(fields: [countryId], references: [id], onDelete: SetNull)
+
+  @@map("bank_accounts")
+}
+
+model Operator {
+  id           String   @id @default(cuid())
+  name         String
+  companyName  String
+  portId       String?
+  status       Status   @default(ACTIVE)
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  stateId      String?
+  zipCode      String?
+  countryId    String?
+  address      String?
+  mobNum       String?
+  telNum       String?
+  email        String?  @unique
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  port    Port?    @relation(fields: [portId], references: [id], onDelete: SetNull)
+  state   State?   @relation(fields: [stateId], references: [id], onDelete: SetNull)
+  country Country? @relation(fields: [countryId], references: [id], onDelete: SetNull)
+
+  @@map("operators")
+}
+
+model Depot {
+  id           String   @id @default(cuid())
+  name         String
+  company      String
+  portId       String?
+  status       Status   @default(ACTIVE)
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  stateId      String?
+  zipCode      String?
+  countryId    String?
+  gstNum       String?
+  panNum       String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  port    Port?    @relation(fields: [portId], references: [id], onDelete: SetNull)
+  state   State?   @relation(fields: [stateId], references: [id], onDelete: SetNull)
+  country Country? @relation(fields: [countryId], references: [id], onDelete: SetNull)
+
+  @@map("depots")
+}
+
+model Tariff {
+  id              String      @id @default(cuid())
+  eventType       EventType
+  productType     ProductType
+  containerTypeId String
+  qty             Int
+  rate            Float
+  pickAgentId     String?
+  pickPortId      String?
+  pickTerminalId  String?
+  nextAgentId     String?
+  nextPortId      String?
+  nextTerminalId  String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relations
+  containerType  ContainerType @relation(fields: [containerTypeId], references: [id], onDelete: Cascade)
+  pickAgent      Agent?        @relation("PickupAgent", fields: [pickAgentId], references: [id], onDelete: SetNull)
+  pickPort       Port?         @relation("PickupPort", fields: [pickPortId], references: [id], onDelete: SetNull)
+  pickTerminal   Terminal?     @relation("PickupTerminal", fields: [pickTerminalId], references: [id], onDelete: SetNull)
+  nextAgent      Agent?        @relation("NextAgent", fields: [nextAgentId], references: [id], onDelete: SetNull)
+  nextPort       Port?         @relation("NextPort", fields: [nextPortId], references: [id], onDelete: SetNull)
+  nextTerminal   Terminal?     @relation("NextTerminal", fields: [nextTerminalId], references: [id], onDelete: SetNull)
+
+  @@map("tariffs")
+}
+
 model Country {
   id              String   @id @default(cuid())
   name            String
@@ -186,7 +539,15 @@ model Country {
   status          Status   @default(ACTIVE)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
-  Port            Port[]
+
+  // Relations
+  currency     Currency?     @relation(fields: [currencyId], references: [id], onDelete: SetNull)
+  ports        Port[]
+  states       State[]
+  agents       Agent[]
+  bankAccounts BankAccount[]
+  operators    Operator[]
+  depots       Depot[]
 
   @@map("countries")
 }
@@ -197,17 +558,23 @@ model Port {
   portType       PortType
   status         Status   @default(ACTIVE)
   countryId      String
-  itaCode        String?
-  portCode       String?
+  itaCode        String?  @unique
+  portCode       String?  @unique
   customsDetails String?
   createdById    String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   // Relations
-  country   Country    @relation(fields: [countryId], references: [id], onDelete: Cascade)
-  createdBy User?      @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  Terminal  Terminal[]
+  country         Country    @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  createdBy       User?      @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  terminals       Terminal[]
+  uploads         Upload[]
+  agents          Agent[]
+  operators       Operator[]
+  depots          Depot[]
+  pickupTariffs   Tariff[]   @relation("PickupPort")
+  nextTariffs     Tariff[]   @relation("NextPort")
 
   @@map("ports")
 }
@@ -223,10 +590,31 @@ model Terminal {
   updatedAt   DateTime @updatedAt
 
   // Relations
-  port      Port  @relation(fields: [portId], references: [id], onDelete: Cascade)
-  createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  port                     Port             @relation(fields: [portId], references: [id], onDelete: Cascade)
+  createdBy                User?            @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  uploads                  Upload[]
+  pickupVesselSchedules    VesselSchedule[] @relation("PickupTerminal")
+  nextPortVesselSchedules  VesselSchedule[] @relation("NextPortTerminal")
+  pickupTariffs            Tariff[]         @relation("PickupTerminal")
+  nextTariffs              Tariff[]         @relation("NextTerminal")
 
   @@map("terminals")
+}
+
+// Uploads
+
+model Upload {
+  id        String   @id @default(cuid())
+  fileUrl   String
+  createdAt DateTime @default(now())
+
+  // Possible owners
+  portId     String?
+  terminalId String?
+
+  // Relations
+  port     Port?     @relation(fields: [portId], references: [id])
+  terminal Terminal? @relation(fields: [terminalId], references: [id])
 }
 
 // Audit Trail / Activity Log
