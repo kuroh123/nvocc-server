@@ -280,6 +280,7 @@ model Agent {
   bankAccounts BankAccount[]
   pickupTariffs Tariff[] @relation("PickupAgent")
   nextTariffs   Tariff[] @relation("NextAgent")
+  uploads      Upload[]
 
   @@map("agents")
 }
@@ -495,6 +496,7 @@ model Depot {
   port    Port?    @relation(fields: [portId], references: [id], onDelete: SetNull)
   state   State?   @relation(fields: [stateId], references: [id], onDelete: SetNull)
   country Country? @relation(fields: [countryId], references: [id], onDelete: SetNull)
+  uploads Upload[]
 
   @@map("depots")
 }
@@ -605,16 +607,22 @@ model Terminal {
 
 model Upload {
   id        String   @id @default(cuid())
+  name      String
+  size      Int
   fileUrl   String
   createdAt DateTime @default(now())
 
   // Possible owners
   portId     String?
   terminalId String?
+  agentId    String?
+  depotId    String?
 
   // Relations
-  port     Port?     @relation(fields: [portId], references: [id])
-  terminal Terminal? @relation(fields: [terminalId], references: [id])
+  port     Port?     @relation(fields: [portId], references: [id], onDelete: Cascade)
+  terminal Terminal? @relation(fields: [terminalId], references: [id], onDelete: Cascade)
+  agent    Agent?    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  depot    Depot?    @relation(fields: [depotId], references: [id], onDelete: Cascade)
 }
 
 // Audit Trail / Activity Log

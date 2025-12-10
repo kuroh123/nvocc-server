@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const cookieParser = require("cookie-parser");
+const path = require("path");
 const { apiLimiter } = require("./middleware/rateLimiter");
 
 // Load environment variables
@@ -26,6 +27,9 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // Cookie parser middleware
 app.use(cookieParser());
+
+// Serve static files from uploads directory
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // Apply rate limiting to all API routes
 app.use("/api", apiLimiter);
