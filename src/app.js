@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const cookieParser = require("cookie-parser");
+const path = require("path");
 const { apiLimiter } = require("./middleware/rateLimiter");
 
 // Load environment variables
@@ -27,6 +28,9 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 // Cookie parser middleware
 app.use(cookieParser());
 
+// Serve static files from uploads directory
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+
 // Apply rate limiting to all API routes
 app.use("/api", apiLimiter);
 
@@ -46,6 +50,25 @@ app.use("/api/countries", require("./routes/country"));
 app.use("/api/ports", require("./routes/port"));
 app.use("/api/terminals", require("./routes/terminal"));
 app.use("/api/test", require("./routes/test"));
+
+// New API Routes
+app.use("/api/currencies", require("./routes/currency"));
+app.use("/api/states", require("./routes/state"));
+app.use("/api/agents", require("./routes/agent"));
+app.use("/api/charges", require("./routes/charge"));
+app.use(
+  "/api/currency-exchange-rates",
+  require("./routes/currencyExchangeRate")
+);
+app.use("/api/vessels", require("./routes/vessel"));
+app.use("/api/vessel-schedules", require("./routes/vesselSchedule"));
+app.use("/api/cargo", require("./routes/cargo"));
+app.use("/api/commodities", require("./routes/commodity"));
+app.use("/api/container-types", require("./routes/containerType"));
+app.use("/api/bank-accounts", require("./routes/bankAccount"));
+app.use("/api/operators", require("./routes/operator"));
+app.use("/api/depots", require("./routes/depot"));
+app.use("/api/tariffs", require("./routes/tariff"));
 
 // 404 handler for API routes - Express v5 compatible with proper regex
 app.use(/^\/api\/.*/, (req, res) => {
