@@ -1,19 +1,100 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const prisma = require("../utils/prisma");
 
 // Get all currency exchange rates
 const getAllCurrencyExchangeRates = async (req, res) => {
   try {
-    const rates = await prisma.currencyExchangeRate.findMany({
-      include: {
-        fromCurrency: true,
-        toCurrency: true,
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      status,
+      fromCurrencyId,
+      toCurrencyId,
+    } = req.query;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Build where clause
+    const where = {};
+
+    if (status) {
+      where.status = status;
+    }
+
+    if (fromCurrencyId) {
+      where.fromCurrencyId = fromCurrencyId;
+    }
+
+    if (toCurrencyId) {
+      where.toCurrencyId = toCurrencyId;
+    }
+
+    if (search) {
+      where.OR = [
+        {
+          fromCurrency: {
+            OR: [
+              { name: { contains: search, mode: "insensitive" } },
+              { code: { contains: search, mode: "insensitive" } },
+            ],
+          },
+        },
+        {
+          toCurrency: {
+            OR: [
+              { name: { contains: search, mode: "insensitive" } },
+              { code: { contains: search, mode: "insensitive" } },
+            ],
+          },
+        },
+      ];
+    }
+
+    const [rates, total] = await Promise.all([
+      prisma.currencyExchangeRate.findMany({
+        where,
+        include: {
+          fromCurrency: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+              symbol: true,
+            },
+          },
+          toCurrency: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+              symbol: true,
+            },
+          },
+        },
+        skip,
+        take: parseInt(limit),
+        orderBy: { validFromDt: "desc" },
+      }),
+      prisma.currencyExchangeRate.count({ where }),
+    ]);
+
+    res.json({
+      success: true,
+      data: rates,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        totalPages: Math.ceil(total / parseInt(limit)),
       },
-      orderBy: { validFromDt: "desc" },
     });
-    res.json(rates);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Get all currency exchange rates error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching currency exchange rates",
+      error: error.message,
+    });
   }
 };
 
@@ -21,23 +102,47 @@ const getAllCurrencyExchangeRates = async (req, res) => {
 const getCurrencyExchangeRateById = async (req, res) => {
   try {
     const { id } = req.params;
+
     const rate = await prisma.currencyExchangeRate.findUnique({
       where: { id },
       include: {
-        fromCurrency: true,
-        toCurrency: true,
+        fromCurrency: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            symbol: true,
+          },
+        },
+        toCurrency: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            symbol: true,
+          },
+        },
       },
     });
 
     if (!rate) {
-      return res
-        .status(404)
-        .json({ error: "Currency exchange rate not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Currency exchange rate not found",
+      });
     }
 
-    res.json(rate);
+    res.json({
+      success: true,
+      data: rate,
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Get currency exchange rate by ID error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching currency exchange rate",
+      error: error.message,
+    });
   }
 };
 
@@ -45,6 +150,13 @@ const getCurrencyExchangeRateById = async (req, res) => {
 const getLatestExchangeRate = async (req, res) => {
   try {
     const { fromCurrencyId, toCurrencyId } = req.query;
+
+    if (!fromCurrencyId || !toCurrencyId) {
+      return res.status(400).json({
+        success: false,
+        message: "fromCurrencyId and toCurrencyId are required",
+      });
+    }
 
     const rate = await prisma.currencyExchangeRate.findFirst({
       where: {
@@ -56,19 +168,44 @@ const getLatestExchangeRate = async (req, res) => {
         },
       },
       include: {
-        fromCurrency: true,
-        toCurrency: true,
+        fromCurrency: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            symbol: true,
+          },
+        },
+        toCurrency: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            symbol: true,
+          },
+        },
       },
       orderBy: { validFromDt: "desc" },
     });
 
     if (!rate) {
-      return res.status(404).json({ error: "Exchange rate not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Exchange rate not found",
+      });
     }
 
-    res.json(rate);
+    res.json({
+      success: true,
+      data: rate,
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Get latest exchange rate error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching latest exchange rate",
+      error: error.message,
+    });
   }
 };
 
@@ -85,9 +222,23 @@ const createCurrencyExchangeRate = async (req, res) => {
       validFromDt,
     } = req.body;
 
+    // Validation
+    if (
+      !fromCurrencyId ||
+      !toCurrencyId ||
+      exchangeRate === undefined ||
+      !validFromDt
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "fromCurrencyId, toCurrencyId, exchangeRate, and validFromDt are required",
+      });
+    }
+
     const rate = await prisma.currencyExchangeRate.create({
       data: {
-        status,
+        status: status || "ACTIVE",
         fromCurrencyId,
         toCurrencyId,
         exchangeRate,
@@ -96,14 +247,37 @@ const createCurrencyExchangeRate = async (req, res) => {
         validFromDt: new Date(validFromDt),
       },
       include: {
-        fromCurrency: true,
-        toCurrency: true,
+        fromCurrency: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            symbol: true,
+          },
+        },
+        toCurrency: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            symbol: true,
+          },
+        },
       },
     });
 
-    res.status(201).json(rate);
+    res.status(201).json({
+      success: true,
+      data: rate,
+      message: "Currency exchange rate created successfully",
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Create currency exchange rate error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error creating currency exchange rate",
+      error: error.message,
+    });
   }
 };
 
@@ -133,19 +307,43 @@ const updateCurrencyExchangeRate = async (req, res) => {
         validFromDt: validFromDt ? new Date(validFromDt) : undefined,
       },
       include: {
-        fromCurrency: true,
-        toCurrency: true,
+        fromCurrency: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            symbol: true,
+          },
+        },
+        toCurrency: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            symbol: true,
+          },
+        },
       },
     });
 
-    res.json(rate);
+    res.json({
+      success: true,
+      data: rate,
+      message: "Currency exchange rate updated successfully",
+    });
   } catch (error) {
+    console.error("Update currency exchange rate error:", error);
     if (error.code === "P2025") {
-      return res
-        .status(404)
-        .json({ error: "Currency exchange rate not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Currency exchange rate not found",
+      });
     }
-    res.status(500).json({ error: error.message });
+    res.status(500).json({
+      success: false,
+      message: "Error updating currency exchange rate",
+      error: error.message,
+    });
   }
 };
 
@@ -158,14 +356,23 @@ const deleteCurrencyExchangeRate = async (req, res) => {
       where: { id },
     });
 
-    res.status(204).send();
+    res.json({
+      success: true,
+      message: "Currency exchange rate deleted successfully",
+    });
   } catch (error) {
+    console.error("Delete currency exchange rate error:", error);
     if (error.code === "P2025") {
-      return res
-        .status(404)
-        .json({ error: "Currency exchange rate not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Currency exchange rate not found",
+      });
     }
-    res.status(500).json({ error: error.message });
+    res.status(500).json({
+      success: false,
+      message: "Error deleting currency exchange rate",
+      error: error.message,
+    });
   }
 };
 

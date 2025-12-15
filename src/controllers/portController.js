@@ -111,7 +111,7 @@ class PortController {
               email: true,
             },
           },
-          Terminal: {
+          terminals: {
             include: {
               createdBy: {
                 select: {
@@ -354,7 +354,7 @@ class PortController {
               email: true,
             },
           },
-          Terminal: {
+          terminals: {
             select: {
               id: true,
               name: true,
@@ -397,7 +397,7 @@ class PortController {
       const existingPort = await prisma.port.findUnique({
         where: { id },
         include: {
-          Terminal: true,
+          terminals: true,
         },
       });
 
@@ -456,7 +456,7 @@ class PortController {
           status: "ACTIVE",
         },
         include: {
-          Terminal: {
+          terminals: {
             where: {
               status: "ACTIVE",
             },
