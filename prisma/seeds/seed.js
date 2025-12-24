@@ -1730,10 +1730,12 @@ async function main() {
       },
     ];
 
+    const createdCharges = {};
     for (const chargeData of chargesData) {
       const charge = await prisma.charge.create({
         data: chargeData,
       });
+      createdCharges[charge.name] = charge;
       console.log(`✅ Created charge: ${charge.displayName}`);
     }
 
@@ -1854,10 +1856,10 @@ async function main() {
     console.log("📊 Creating tariffs...");
     const tariffsData = [
       {
-        eventType: "PICKUP",
-        productType: "EXPORT",
+        eventType: "EXPORT",
+        productType: "NON_HAZ",
         containerTypeId: createdContainerTypes["20DC"].id,
-        qty: 1,
+        chargeId: createdCharges["ocean_freight"].id,
         rate: 1500.0,
         pickAgentId: createdAgents["Pacific Logistics"].id,
         pickPortId: createdPorts["USLAX"].id,
@@ -1867,10 +1869,10 @@ async function main() {
         nextTerminalId: createdTerminals["Mumbai JNPT Terminal"].id,
       },
       {
-        eventType: "DELIVERY",
-        productType: "IMPORT",
+        eventType: "IMPORT",
+        productType: "NON_HAZ",
         containerTypeId: createdContainerTypes["40DC"].id,
-        qty: 2,
+        chargeId: createdCharges["ocean_freight"].id,
         rate: 2000.0,
         pickAgentId: createdAgents["Mumbai Freight Services"].id,
         pickPortId: createdPorts["INBOM"].id,
@@ -1880,10 +1882,10 @@ async function main() {
         nextTerminalId: createdTerminals["LAX Terminal 2"].id,
       },
       {
-        eventType: "TRANSIT",
-        productType: "TRANSSHIPMENT",
+        eventType: "EXPORT",
+        productType: "NON_HAZ",
         containerTypeId: createdContainerTypes["40HC"].id,
-        qty: 1,
+        chargeId: createdCharges["terminal_handling"].id,
         rate: 2500.0,
         pickPortId: createdPorts["SGSIN"].id,
         pickTerminalId: createdTerminals["Singapore PSA Terminal"].id,
@@ -1891,19 +1893,19 @@ async function main() {
         nextTerminalId: createdTerminals["Shanghai Yangshan Terminal"].id,
       },
       {
-        eventType: "STORAGE",
-        productType: "EXPORT",
+        eventType: "EXPORT",
+        productType: "HAZ",
         containerTypeId: createdContainerTypes["20RF"].id,
-        qty: 3,
+        chargeId: createdCharges["documentation_fee"].id,
         rate: 300.0,
         pickPortId: createdPorts["INMAA"].id,
         pickTerminalId: createdTerminals["Chennai Container Terminal"].id,
       },
       {
-        eventType: "PICKUP",
-        productType: "IMPORT",
+        eventType: "IMPORT",
+        productType: "HAZ",
         containerTypeId: createdContainerTypes["40RF"].id,
-        qty: 1,
+        chargeId: createdCharges["customs_clearance"].id,
         rate: 1800.0,
         pickPortId: createdPorts["GBLGW"].id,
         pickTerminalId: createdTerminals["London Gateway Terminal 1"].id,

@@ -59,16 +59,13 @@ enum VesselType {
 }
 
 enum EventType {
-  PICKUP
-  DELIVERY
-  TRANSIT
-  STORAGE
+  IMPORT
+  EXPORT
 }
 
 enum ProductType {
-  EXPORT
-  IMPORT
-  TRANSSHIPMENT
+  HAZ
+  NON_HAZ
 }
 
 model Tenant {
@@ -296,6 +293,9 @@ model Charge {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  // Relations
+  tariffs Tariff[]
+
   @@map("charges")
 }
 
@@ -506,7 +506,7 @@ model Tariff {
   eventType       EventType
   productType     ProductType
   containerTypeId String
-  qty             Int
+  chargeId        String?
   rate            Float
   pickAgentId     String?
   pickPortId      String?
@@ -519,6 +519,7 @@ model Tariff {
 
   // Relations
   containerType  ContainerType @relation(fields: [containerTypeId], references: [id], onDelete: Cascade)
+  charge         Charge?       @relation(fields: [chargeId], references: [id], onDelete: SetNull)
   pickAgent      Agent?        @relation("PickupAgent", fields: [pickAgentId], references: [id], onDelete: SetNull)
   pickPort       Port?         @relation("PickupPort", fields: [pickPortId], references: [id], onDelete: SetNull)
   pickTerminal   Terminal?     @relation("PickupTerminal", fields: [pickTerminalId], references: [id], onDelete: SetNull)

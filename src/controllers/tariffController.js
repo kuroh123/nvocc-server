@@ -58,6 +58,13 @@ const getAllTariffs = async (req, res) => {
               isoCode: true,
             },
           },
+          charge: {
+            select: {
+              id: true,
+              name: true,
+              sacHsnCode: true,
+            },
+          },
           pickAgent: {
             select: {
               id: true,
@@ -458,7 +465,7 @@ const createTariff = async (req, res) => {
       eventType,
       productType,
       containerTypeId,
-      qty,
+      chargeId,
       rate,
       pickAgentId,
       pickPortId,
@@ -513,7 +520,7 @@ const createTariff = async (req, res) => {
         eventType,
         productType,
         containerTypeId,
-        qty,
+        chargeId,
         rate,
         pickAgentId,
         pickPortId,
@@ -528,6 +535,13 @@ const createTariff = async (req, res) => {
             id: true,
             name: true,
             isoCode: true,
+          },
+        },
+        charge: {
+          select: {
+            id: true,
+            name: true,
+            sacHsnCode: true,
           },
         },
         pickAgent: {
